@@ -3,30 +3,34 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
-    "build": "bun run scripts/build.ts",
-    "test": "bun test",
+    "build": "node scripts/build.ts",
+    "test": "npm run build && node --test test/compat.test.ts test/options.test.ts test/stream.test.ts test/malformed.test.ts",
     "typecheck": "tsc --noEmit",
-    "bench": "bun run build && bun run bench/bench.ts",
-    "verify:server": "bun run build && bun run verification/server-adoption.ts",
-    "verify:browser": "bun run build && bun run verification/browser-adoption.ts",
-    "verify:browser-script": "bun run build && bun run verification/browser-script-adoption.ts",
-    "verify:options": "bun run build && bun run verification/options-compat.ts",
-    "verify:multi": "bun run build && bun run verification/multi-decode.ts",
-    "verify:stream": "bun run build && bun run verification/stream-decode.ts",
-    "verify:malformed": "bun run build && bun run verification/malformed-input.ts",
-    "verify:surface": "bun run build && bun run verification/surface.ts",
-    "verify:typed": "bun run build && bun run verification/typed-adoption.ts",
-    "verify:classic-typed": "bun run build && bun run verification/classic-typed-adoption.ts",
-    "verify:classic-bundler": "bun run build && bun run verification/classic-bundler-adoption.ts",
-    "verify:adoption": "bun run build && bun run verification/server-adoption.ts && bun run verification/browser-adoption.ts && bun run verification/typed-adoption.ts && bun run verification/classic-typed-adoption.ts && bun run verification/classic-bundler-adoption.ts && bun run verification/browser-script-adoption.ts"
+    "bench": "npm run build && node --expose-gc bench/bench.ts",
+    "verify:server": "npm run build && node verification/server-adoption.ts",
+    "verify:browser": "npm run build && node verification/browser-adoption.ts",
+    "verify:browser-script": "npm run build && node verification/browser-script-adoption.ts",
+    "verify:options": "npm run build && node verification/options-compat.ts",
+    "verify:multi": "npm run build && node verification/multi-decode.ts",
+    "verify:stream": "npm run build && node verification/stream-decode.ts",
+    "verify:malformed": "npm run build && node verification/malformed-input.ts",
+    "verify:surface": "npm run build && node verification/surface.ts",
+    "verify:typed": "npm run build && node verification/typed-adoption.ts",
+    "verify:classic-typed": "npm run build && node verification/classic-typed-adoption.ts",
+    "verify:classic-bundler": "npm run build && node verification/classic-bundler-adoption.ts",
+    "verify:adoption": "npm run build && node verification/server-adoption.ts && node verification/browser-adoption.ts && node verification/typed-adoption.ts && node verification/classic-typed-adoption.ts && node verification/classic-bundler-adoption.ts && node verification/browser-script-adoption.ts"
   },
   "devDependencies": {
-    "@dsdenes/msgpack": "workspace:*",
-    "@types/bun": "^1.2.0",
+    "@dsdenes/msgpack": "*",
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.28.2",
     "msgpack-javascript-original": "npm:@msgpack/msgpack@3.1.3",
     "typescript": "^5.7.2"
   }

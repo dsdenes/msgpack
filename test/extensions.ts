@@ -6,14 +6,21 @@ export interface Payload {
 }
 
 export class GeoPoint {
-  constructor(
-    public lat: number,
-    public lon: number,
-  ) {}
+  lat: number;
+  lon: number;
+
+  constructor(lat: number, lon: number) {
+    this.lat = lat;
+    this.lon = lon;
+  }
 }
 
 export class Blob {
-  constructor(public bytes: Uint8Array) {}
+  bytes: Uint8Array;
+
+  constructor(bytes: Uint8Array) {
+    this.bytes = bytes;
+  }
 }
 
 interface Registerable {

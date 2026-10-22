@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
@@ -46,17 +47,18 @@ function run(
   env: Record<string, string> = {},
   cwd = root,
 ): { code: number; stdout: string; output: string } {
-  const result = Bun.spawnSync(command, {
+  const result = spawnSync(command[0], command.slice(1), {
     cwd,
-    stdout: "pipe",
-    stderr: "pipe",
+    encoding: "utf8",
     env: { ...process.env, ...env },
+    timeout: 120_000,
+    maxBuffer: 32 * 1024 * 1024,
   });
-  const stdout = result.stdout.toString();
+  const stdout = result.stdout ?? "";
   return {
-    code: result.exitCode ?? -1,
+    code: result.status ?? -1,
     stdout,
-    output: `${stdout}${result.stderr.toString()}`.trim(),
+    output: `${stdout}${result.stderr ?? ""}`.trim(),
   };
 }
 

@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+- Move the repository to Node.js 24 LTS (Krypton) as its single runtime and
+  toolchain. Root `engines.node` accepts only `24.x`, `.nvmrc` pins `24`, and
+  `package-lock.json` replaces `bun.lock`.
+- Run every script with `npm` and `node`: the build uses `esbuild`, tests use
+  `node:test` and `node:assert`, the benchmark uses Node timers and child
+  processes, and the verification scripts install generated applications with
+  `npm`, serve them with `node:http`, and drive the existing examples through
+  `node`. The examples' server and typed applications run on Node.
+- Remove Bun from the repository: `bun.lock`, `@types/bun`, `bun:test`, every
+  `Bun.*` API, and every `bun`/`bunx` command are gone.
+- Decode flat arrays of scalar values directly into the array, so long numeric
+  and float arrays decode faster on Node while bytes, values, errors, options,
+  and the public API stay identical.
+- Re-measure the 33-case benchmark on Node.js 24.18.0; every payload remains
+  faster than msgpack-javascript 3.1.3 for both encoding and decoding.
+- The published package keeps version `1.0.0`, no `engines` field, no runtime
+  dependencies, identical bytes and decoded values, the same error types and
+  messages, the same tarball contents, and browser support through the UMD
+  bundle.
+
 ## 1.0.0
 
 - Rename the package from `@devboard/msgpack` to `@dsdenes/msgpack` and publish

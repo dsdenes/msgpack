@@ -19,47 +19,29 @@
     var module = { exports: {} };
     var exports = module.exports;
 
+    "use strict";
     var __defProp = Object.defineProperty;
-    var __getOwnPropNames = Object.getOwnPropertyNames;
     var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+    var __getOwnPropNames = Object.getOwnPropertyNames;
     var __hasOwnProp = Object.prototype.hasOwnProperty;
-    function __accessProp(key) {
-      return this[key];
-    }
-    var __toCommonJS = (from) => {
-      var entry = (__moduleCache ??= new WeakMap).get(from), desc;
-      if (entry)
-        return entry;
-      entry = __defProp({}, "__esModule", { value: true });
-      if (from && typeof from === "object" || typeof from === "function") {
-        for (var key of __getOwnPropNames(from))
-          if (!__hasOwnProp.call(entry, key))
-            __defProp(entry, key, {
-              get: __accessProp.bind(from, key),
-              enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable
-            });
-      }
-      __moduleCache.set(from, entry);
-      return entry;
-    };
-    var __moduleCache;
-    var __returnValue = (v) => v;
-    function __exportSetter(name, newValue) {
-      this[name] = __returnValue.bind(null, newValue);
-    }
+    var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
     var __export = (target, all) => {
       for (var name in all)
-        __defProp(target, name, {
-          get: all[name],
-          enumerable: true,
-          configurable: true,
-          set: __exportSetter.bind(all, name)
-        });
+        __defProp(target, name, { get: all[name], enumerable: true });
     };
+    var __copyProps = (to, from, except, desc) => {
+      if (from && typeof from === "object" || typeof from === "function") {
+        for (let key of __getOwnPropNames(from))
+          if (!__hasOwnProp.call(to, key) && key !== except)
+            __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+      }
+      return to;
+    };
+    var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
     // packages/msgpack/src/index.ts
-    var exports_src = {};
-    __export(exports_src, {
+    var index_exports = {};
+    __export(index_exports, {
       DEFAULT_INITIAL_BUFFER_SIZE: () => DEFAULT_INITIAL_BUFFER_SIZE,
       DecodeError: () => DecodeError,
       Decoder: () => Decoder,
@@ -74,19 +56,21 @@
       decodeMultiStream: () => decodeMultiStream,
       decodeTimestampExtension: () => decodeTimestampExtension,
       decodeTimestampToTimeSpec: () => decodeTimestampToTimeSpec,
-      default: () => src_default,
+      default: () => index_default,
       encode: () => encode,
       encodeDateToTimeSpec: () => encodeDateToTimeSpec,
       encodeTimeSpecToTimestamp: () => encodeTimeSpecToTimestamp,
       encodeTimestampExtension: () => encodeTimestampExtension,
       timestampExtension: () => timestampExtension
     });
-    module.exports = __toCommonJS(exports_src);
+    module.exports = __toCommonJS(index_exports);
 
     // packages/msgpack/src/writer.ts
     var DEFAULT_INITIAL_BUFFER_SIZE = 2048;
-
-    class Writer {
+    var Writer = class {
+      static {
+        __name(this, "Writer");
+      }
       bytes;
       view;
       pos = 0;
@@ -112,17 +96,19 @@
         this.bytes = next;
         this.view = new DataView(next.buffer);
       }
+      /** A copy that does not alias the writer's reusable buffer. */
       copy() {
         return this.bytes.slice(0, this.pos);
       }
+      /** A view into the writer's buffer, valid until the next reset/grow. */
       ref() {
         return this.bytes.subarray(0, this.pos);
       }
-    }
+    };
 
     // packages/msgpack/src/utf8.ts
-    var sharedEncoder = new TextEncoder;
-    var sharedDecoder = new TextDecoder;
+    var sharedEncoder = new TextEncoder();
+    var sharedDecoder = new TextDecoder();
     function utf8Count(str) {
       const length = str.length;
       let bytes = 0;
@@ -146,21 +132,24 @@
       }
       return bytes;
     }
+    __name(utf8Count, "utf8Count");
     function asciiByteLength(str) {
       const length = str.length;
-      for (let i = 0;i < length; i++) {
+      for (let i = 0; i < length; i++) {
         if (str.charCodeAt(i) > 127) {
           return -1;
         }
       }
       return length;
     }
+    __name(asciiByteLength, "asciiByteLength");
     function writeAscii(str, output, offset) {
       const length = str.length;
-      for (let i = 0;i < length; i++) {
+      for (let i = 0; i < length; i++) {
         output[offset + i] = str.charCodeAt(i);
       }
     }
+    __name(writeAscii, "writeAscii");
     function writeUtf8Js(str, output, offset) {
       const length = str.length;
       let pos = 0;
@@ -192,6 +181,7 @@
         output[offset++] = value & 63 | 128;
       }
     }
+    __name(writeUtf8Js, "writeUtf8Js");
     var ASCII_CHUNK = 4096;
     var TEXT_DECODER_THRESHOLD = 200;
     function readUtf8Js(bytes, start, end) {
@@ -233,6 +223,7 @@
       }
       return result;
     }
+    __name(readUtf8Js, "readUtf8Js");
     function readUtf8(bytes, start, length) {
       if (length === 0) {
         return "";
@@ -242,7 +233,7 @@
         return sharedDecoder.decode(bytes.subarray(start, end));
       }
       let ascii = true;
-      for (let i = start;i < end; i++) {
+      for (let i = start; i < end; i++) {
         if (bytes[i] > 127) {
           ascii = false;
           break;
@@ -251,7 +242,7 @@
       if (ascii) {
         if (length <= 8) {
           let result = "";
-          for (let i = start;i < end; i++) {
+          for (let i = start; i < end; i++) {
             result += String.fromCharCode(bytes[i]);
           }
           return result;
@@ -260,19 +251,23 @@
       }
       return readUtf8Js(bytes, start, end);
     }
+    __name(readUtf8, "readUtf8");
 
     // packages/msgpack/src/decode-error.ts
-    class DecodeError extends Error {
+    var DecodeError = class _DecodeError extends Error {
+      static {
+        __name(this, "DecodeError");
+      }
       constructor(message) {
         super(message);
-        Object.setPrototypeOf(this, DecodeError.prototype);
+        Object.setPrototypeOf(this, _DecodeError.prototype);
         Object.defineProperty(this, "name", {
           configurable: true,
           enumerable: false,
-          value: DecodeError.name
+          value: _DecodeError.name
         });
       }
-    }
+    };
 
     // packages/msgpack/src/timestamp.ts
     var EXT_TIMESTAMP = -1;
@@ -282,26 +277,28 @@
       view.setUint32(offset, Math.floor(value / 4294967296));
       view.setUint32(offset + 4, value);
     }
+    __name(setInt64, "setInt64");
     function getInt64(view, offset) {
       const high = view.getInt32(offset);
       const low = view.getUint32(offset + 4);
       return high * 4294967296 + low;
     }
+    __name(getInt64, "getInt64");
     function encodeTimeSpecToTimestamp({ sec, nsec }) {
       if (sec >= 0 && nsec >= 0 && sec <= TIMESTAMP64_MAX_SEC) {
         if (nsec === 0 && sec <= TIMESTAMP32_MAX_SEC) {
-          const rv = new Uint8Array(4);
-          const view = new DataView(rv.buffer);
-          view.setUint32(0, sec);
-          return rv;
+          const rv3 = new Uint8Array(4);
+          const view3 = new DataView(rv3.buffer);
+          view3.setUint32(0, sec);
+          return rv3;
         }
         const secHigh = sec / 4294967296;
         const secLow = sec & 4294967295;
-        const rv = new Uint8Array(8);
-        const view = new DataView(rv.buffer);
-        view.setUint32(0, nsec << 2 | secHigh & 3);
-        view.setUint32(4, secLow);
-        return rv;
+        const rv2 = new Uint8Array(8);
+        const view2 = new DataView(rv2.buffer);
+        view2.setUint32(0, nsec << 2 | secHigh & 3);
+        view2.setUint32(4, secLow);
+        return rv2;
       }
       const rv = new Uint8Array(12);
       const view = new DataView(rv.buffer);
@@ -309,16 +306,18 @@
       setInt64(view, 4, sec);
       return rv;
     }
+    __name(encodeTimeSpecToTimestamp, "encodeTimeSpecToTimestamp");
     function encodeDateToTimeSpec(date) {
       const msec = date.getTime();
-      const sec = Math.floor(msec / 1000);
-      const nsec = (msec - sec * 1000) * 1e6;
+      const sec = Math.floor(msec / 1e3);
+      const nsec = (msec - sec * 1e3) * 1e6;
       const nsecInSec = Math.floor(nsec / 1e9);
       return {
         sec: sec + nsecInSec,
         nsec: nsec - nsecInSec * 1e9
       };
     }
+    __name(encodeDateToTimeSpec, "encodeDateToTimeSpec");
     function encodeTimestampExtension(object) {
       if (object instanceof Date) {
         const timeSpec = encodeDateToTimeSpec(object);
@@ -326,6 +325,7 @@
       }
       return null;
     }
+    __name(encodeTimestampExtension, "encodeTimestampExtension");
     function decodeTimestampToTimeSpec(data) {
       const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
       switch (data.byteLength) {
@@ -347,10 +347,12 @@
           throw new DecodeError(`Unrecognized data size for timestamp (expected 4, 8, or 12): ${data.length}`);
       }
     }
+    __name(decodeTimestampToTimeSpec, "decodeTimestampToTimeSpec");
     function decodeTimestampExtension(data) {
       const timeSpec = decodeTimestampToTimeSpec(data);
-      return new Date(timeSpec.sec * 1000 + timeSpec.nsec / 1e6);
+      return new Date(timeSpec.sec * 1e3 + timeSpec.nsec / 1e6);
     }
+    __name(decodeTimestampExtension, "decodeTimestampExtension");
     var timestampExtension = {
       type: EXT_TIMESTAMP,
       encode: encodeTimestampExtension,
@@ -358,17 +360,23 @@
     };
 
     // packages/msgpack/src/extension.ts
-    class ExtData {
-      type;
-      data;
+    var ExtData = class {
       constructor(type, data) {
         this.type = type;
         this.data = data;
       }
-    }
-
-    class ExtensionCodec {
-      static defaultCodec = new ExtensionCodec;
+      type;
+      data;
+      static {
+        __name(this, "ExtData");
+      }
+    };
+    var ExtensionCodec = class _ExtensionCodec {
+      static {
+        __name(this, "ExtensionCodec");
+      }
+      static defaultCodec = new _ExtensionCodec();
+      // Built-in extensions use negative types; custom extensions use types >= 0.
       builtInEncoders = [];
       builtInDecoders = [];
       encoders = [];
@@ -376,18 +384,18 @@
       constructor() {
         this.register(timestampExtension);
       }
-      register({ type, encode, decode }) {
+      register({ type, encode: encode2, decode: decode2 }) {
         if (type >= 0) {
-          this.encoders[type] = encode;
-          this.decoders[type] = decode;
+          this.encoders[type] = encode2;
+          this.decoders[type] = decode2;
         } else {
           const index = -1 - type;
-          this.builtInEncoders[index] = encode;
-          this.builtInDecoders[index] = decode;
+          this.builtInEncoders[index] = encode2;
+          this.builtInDecoders[index] = decode2;
         }
       }
       tryToEncode(object, context) {
-        for (let i = 0;i < this.builtInEncoders.length; i++) {
+        for (let i = 0; i < this.builtInEncoders.length; i++) {
           const encodeExt = this.builtInEncoders[i];
           if (encodeExt != null) {
             const data = encodeExt(object, context);
@@ -396,7 +404,7 @@
             }
           }
         }
-        for (let i = 0;i < this.encoders.length; i++) {
+        for (let i = 0; i < this.encoders.length; i++) {
           const encodeExt = this.encoders[i];
           if (encodeExt != null) {
             const data = encodeExt(object, context);
@@ -417,14 +425,14 @@
         }
         return new ExtData(type, data);
       }
-    }
+    };
 
     // packages/msgpack/src/encoder.ts
     var TEXT_ENCODER_THRESHOLD = 50;
     var DEFAULT_MAX_DEPTH = 100;
     var DEFAULT_ENCODER_SETTINGS = {
       extensionCodec: ExtensionCodec.defaultCodec,
-      context: undefined,
+      context: void 0,
       useBigInt64: false,
       maxDepth: DEFAULT_MAX_DEPTH,
       sortKeys: false,
@@ -433,7 +441,7 @@
       ignoreUndefined: false
     };
     function resolveEncoderSettings(options) {
-      if (options === undefined) {
+      if (options === void 0) {
         return DEFAULT_ENCODER_SETTINGS;
       }
       return {
@@ -447,8 +455,11 @@
         ignoreUndefined: options.ignoreUndefined ?? false
       };
     }
-
-    class Encoder {
+    __name(resolveEncoderSettings, "resolveEncoderSettings");
+    var Encoder = class _Encoder {
+      static {
+        __name(this, "Encoder");
+      }
       writer;
       options;
       settings;
@@ -458,9 +469,10 @@
         this.settings = resolveEncoderSettings(options);
         this.writer = new Writer(options?.initialBufferSize ?? DEFAULT_INITIAL_BUFFER_SIZE);
       }
+      /** Returns encoded bytes that are safe to keep across later encode calls. */
       encode(value) {
         if (this.entered) {
-          return new Encoder(this.options).encode(value);
+          return new _Encoder(this.options).encode(value);
         }
         this.entered = true;
         try {
@@ -471,9 +483,10 @@
           this.entered = false;
         }
       }
+      /** Returns an internal-buffer view, valid until the next encode call. */
       encodeSharedRef(value) {
         if (this.entered) {
-          return new Encoder(this.options).encodeSharedRef(value);
+          return new _Encoder(this.options).encodeSharedRef(value);
         }
         this.entered = true;
         try {
@@ -484,8 +497,8 @@
           this.entered = false;
         }
       }
-    }
-    var sharedWriter = new Writer;
+    };
+    var sharedWriter = new Writer();
     var sharedWriterEntered = false;
     function encode(value, options) {
       const settings = resolveEncoderSettings(options);
@@ -493,7 +506,7 @@
         sharedWriterEntered = true;
         try {
           sharedWriter.reset();
-          if (options?.initialBufferSize !== undefined) {
+          if (options?.initialBufferSize !== void 0) {
             sharedWriter.ensure(options.initialBufferSize);
           }
           encodeValue(sharedWriter, value, settings, 1);
@@ -504,11 +517,12 @@
       }
       return new Encoder(options).encode(value);
     }
+    __name(encode, "encode");
     function encodeValue(writer, value, settings, depth) {
       if (depth > settings.maxDepth) {
         throw new Error(`Too deep objects in depth ${depth}`);
       }
-      if (value === null || value === undefined) {
+      if (value === null || value === void 0) {
         writer.ensure(1);
         writer.bytes[writer.pos++] = 192;
         return;
@@ -545,6 +559,7 @@
       }
       throw new Error(`Unrecognized object: ${Object.prototype.toString.apply(value)}`);
     }
+    __name(encodeValue, "encodeValue");
     function encodeNumber(writer, value, settings) {
       if (Number.isSafeInteger(value)) {
         if (value >= 0) {
@@ -606,6 +621,7 @@
       }
       encodeNumberAsFloat(writer, value, settings.forceFloat32);
     }
+    __name(encodeNumber, "encodeNumber");
     function encodeNumberAsFloat(writer, value, forceFloat32) {
       writer.ensure(9);
       if (forceFloat32) {
@@ -618,6 +634,7 @@
       writer.view.setFloat64(writer.pos + 1, value);
       writer.pos += 9;
     }
+    __name(encodeNumberAsFloat, "encodeNumberAsFloat");
     function encodeBigInt64(writer, value) {
       writer.ensure(9);
       if (value >= 0n) {
@@ -629,6 +646,7 @@
       }
       writer.pos += 9;
     }
+    __name(encodeBigInt64, "encodeBigInt64");
     function writeStringHeader(writer, byteLength) {
       const bytes = writer.bytes;
       if (byteLength < 32) {
@@ -650,6 +668,7 @@
         writer.pos += 5;
       }
     }
+    __name(writeStringHeader, "writeStringHeader");
     function encodeString(writer, value) {
       if (value.length <= TEXT_ENCODER_THRESHOLD) {
         const asciiLength = asciiByteLength(value);
@@ -660,11 +679,11 @@
           writer.pos += asciiLength;
           return;
         }
-        const byteLength = utf8Count(value);
-        writer.ensure(5 + byteLength);
-        writeStringHeader(writer, byteLength);
+        const byteLength2 = utf8Count(value);
+        writer.ensure(5 + byteLength2);
+        writeStringHeader(writer, byteLength2);
         writeUtf8Js(value, writer.bytes, writer.pos);
-        writer.pos += byteLength;
+        writer.pos += byteLength2;
         return;
       }
       const encoded = sharedEncoder.encode(value);
@@ -674,6 +693,7 @@
       writer.bytes.set(encoded, writer.pos);
       writer.pos += byteLength;
     }
+    __name(encodeString, "encodeString");
     function encodeBinary(writer, value) {
       const size = value.byteLength;
       if (size < 256) {
@@ -695,10 +715,14 @@
       if (value instanceof Uint8Array && value.buffer === writer.bytes.buffer) {
         writer.bytes.set(new Uint8Array(value), writer.pos);
       } else {
-        writer.bytes.set(value instanceof Uint8Array ? value : new Uint8Array(value.buffer, value.byteOffset, value.byteLength), writer.pos);
+        writer.bytes.set(
+          value instanceof Uint8Array ? value : new Uint8Array(value.buffer, value.byteOffset, value.byteLength),
+          writer.pos
+        );
       }
       writer.pos += size;
     }
+    __name(encodeBinary, "encodeBinary");
     function encodeArray(writer, value, settings, depth) {
       const size = value.length;
       if (size < 16) {
@@ -715,10 +739,11 @@
         writer.view.setUint32(writer.pos + 1, size);
         writer.pos += 5;
       }
-      for (let i = 0;i < size; i++) {
+      for (let i = 0; i < size; i++) {
         encodeValue(writer, value[i], settings, depth + 1);
       }
     }
+    __name(encodeArray, "encodeArray");
     function encodeMap(writer, value, settings, depth) {
       const keys = Object.keys(value);
       if (settings.sortKeys) {
@@ -727,8 +752,8 @@
       let size = keys.length;
       if (settings.ignoreUndefined) {
         size = 0;
-        for (let i = 0;i < keys.length; i++) {
-          if (value[keys[i]] !== undefined) {
+        for (let i = 0; i < keys.length; i++) {
+          if (value[keys[i]] !== void 0) {
             size++;
           }
         }
@@ -747,15 +772,16 @@
         writer.view.setUint32(writer.pos + 1, size);
         writer.pos += 5;
       }
-      for (let i = 0;i < keys.length; i++) {
+      for (let i = 0; i < keys.length; i++) {
         const key = keys[i];
         const entry = value[key];
-        if (!(settings.ignoreUndefined && entry === undefined)) {
+        if (!(settings.ignoreUndefined && entry === void 0)) {
           encodeString(writer, key);
           encodeValue(writer, entry, settings, depth + 1);
         }
       }
     }
+    __name(encodeMap, "encodeMap");
     function encodeObject(writer, value, settings, depth) {
       const ext = settings.extensionCodec.tryToEncode(value, settings.context);
       if (ext !== null) {
@@ -770,20 +796,21 @@
         encodeMap(writer, value, settings, depth);
       }
     }
+    __name(encodeObject, "encodeObject");
     function encodeExtension(writer, ext) {
       if (typeof ext.data === "function") {
         const data = ext.data(writer.pos + 6);
-        const size = data.length;
-        if (size >= 4294967296) {
-          throw new Error(`Too large extension object: ${size}`);
+        const size2 = data.length;
+        if (size2 >= 4294967296) {
+          throw new Error(`Too large extension object: ${size2}`);
         }
-        writer.ensure(6 + size);
-        const pos = writer.pos;
-        writer.bytes[pos] = 201;
-        writer.view.setUint32(pos + 1, size);
-        writer.view.setInt8(pos + 5, ext.type);
-        writer.bytes.set(data, pos + 6);
-        writer.pos = pos + 6 + size;
+        writer.ensure(6 + size2);
+        const pos2 = writer.pos;
+        writer.bytes[pos2] = 201;
+        writer.view.setUint32(pos2 + 1, size2);
+        writer.view.setInt8(pos2 + 5, ext.type);
+        writer.bytes.set(data, pos2 + 6);
+        writer.pos = pos2 + 6 + size2;
         return;
       }
       const size = ext.data.length;
@@ -831,6 +858,7 @@
       bytes.set(ext.data, pos + headerSize + 1);
       writer.pos = pos + headerSize + 1 + size;
     }
+    __name(encodeExtension, "encodeExtension");
 
     // packages/msgpack/src/stream.ts
     function isAsyncIterable(object) {
@@ -839,6 +867,7 @@
       }
       return typeof object[Symbol.asyncIterator] === "function";
     }
+    __name(isAsyncIterable, "isAsyncIterable");
     async function* asyncIterableFromStream(stream) {
       const reader = stream.getReader();
       try {
@@ -853,9 +882,11 @@
         reader.releaseLock();
       }
     }
+    __name(asyncIterableFromStream, "asyncIterableFromStream");
     function ensureAsyncIterable(streamLike) {
       return isAsyncIterable(streamLike) ? streamLike : asyncIterableFromStream(streamLike);
     }
+    __name(ensureAsyncIterable, "ensureAsyncIterable");
 
     // packages/msgpack/src/decoder.ts
     var UINT32_MAX = 4294967295;
@@ -863,23 +894,23 @@
     var EMPTY_BYTES = new Uint8Array(0);
     var KEY_MAX_LENGTH = 16;
     var keyCaches = [];
-    for (let i = 0;i < KEY_MAX_LENGTH; i++) {
+    for (let i = 0; i < KEY_MAX_LENGTH; i++) {
       keyCaches.push([]);
     }
     function lookupKey(bytes, start, length) {
       const entries = keyCaches[length - 1];
-      SCAN:
-        for (let i = 0;i < entries.length; i++) {
-          const cached = entries[i].bytes;
-          for (let j = 0;j < length; j++) {
-            if (cached[j] !== bytes[start + j]) {
-              continue SCAN;
-            }
+      SCAN: for (let i = 0; i < entries.length; i++) {
+        const cached = entries[i].bytes;
+        for (let j = 0; j < length; j++) {
+          if (cached[j] !== bytes[start + j]) {
+            continue SCAN;
           }
-          return entries[i].value;
         }
+        return entries[i].value;
+      }
       return null;
     }
+    __name(lookupKey, "lookupKey");
     function storeKey(bytes, start, length, value) {
       const entries = keyCaches[length - 1];
       const entry = { bytes: bytes.slice(start, start + length), value };
@@ -889,6 +920,7 @@
       }
       entries.push(entry);
     }
+    __name(storeKey, "storeKey");
     var defaultKeyDecoder = {
       canBeCached(byteLength) {
         return byteLength > 0 && byteLength <= KEY_MAX_LENGTH;
@@ -909,9 +941,10 @@
       }
       throw new DecodeError("The type of key must be string or number but " + typeof key);
     }
+    __name(defaultMapKeyConverter, "defaultMapKeyConverter");
     var DEFAULT_DECODER_SETTINGS = {
       extensionCodec: ExtensionCodec.defaultCodec,
-      context: undefined,
+      context: void 0,
       useBigInt64: false,
       rawStrings: false,
       maxStrLength: UINT32_MAX,
@@ -923,7 +956,7 @@
       mapKeyConverter: defaultMapKeyConverter
     };
     function resolveDecoderSettings(options) {
-      if (options === undefined) {
+      if (options === void 0) {
         return DEFAULT_DECODER_SETTINGS;
       }
       return {
@@ -936,15 +969,18 @@
         maxArrayLength: options.maxArrayLength ?? UINT32_MAX,
         maxMapLength: options.maxMapLength ?? UINT32_MAX,
         maxExtLength: options.maxExtLength ?? UINT32_MAX,
-        keyDecoder: options.keyDecoder !== undefined ? options.keyDecoder : defaultKeyDecoder,
+        keyDecoder: options.keyDecoder !== void 0 ? options.keyDecoder : defaultKeyDecoder,
         mapKeyConverter: options.mapKeyConverter ?? defaultMapKeyConverter
       };
     }
+    __name(resolveDecoderSettings, "resolveDecoderSettings");
     var STATE_ARRAY = 0;
     var STATE_MAP_KEY = 1;
     var STATE_MAP_VALUE = 2;
-
-    class Reader {
+    var Reader = class {
+      static {
+        __name(this, "Reader");
+      }
       bytes = new Uint8Array(0);
       view = new DataView(new ArrayBuffer(0));
       pos = 0;
@@ -963,6 +999,7 @@
         this.head = HEAD_BYTE_REQUIRED;
         this.stackLength = 0;
       }
+      /** Appends a stream chunk, keeping only the bytes not yet consumed. */
       append(input) {
         const newBytes = toBytes(input);
         if (this.head === HEAD_BYTE_REQUIRED && this.bytes.length - this.pos < 1) {
@@ -980,7 +1017,7 @@
         this.view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
         this.pos = 0;
       }
-    }
+    };
     function toBytes(input) {
       if (input instanceof Uint8Array) {
         return input;
@@ -993,11 +1030,14 @@
       }
       return Uint8Array.from(input);
     }
-    var sharedReader = new Reader;
+    __name(toBytes, "toBytes");
+    var sharedReader = new Reader();
     var sharedReaderEntered = false;
-
-    class Decoder {
-      reader = new Reader;
+    var Decoder = class _Decoder {
+      static {
+        __name(this, "Decoder");
+      }
+      reader = new Reader();
       options;
       settings;
       entered = false;
@@ -1007,7 +1047,7 @@
       }
       decode(buffer) {
         if (this.entered) {
-          return new Decoder(this.options).decode(buffer);
+          return new _Decoder(this.options).decode(buffer);
         }
         this.entered = true;
         try {
@@ -1017,7 +1057,9 @@
           reader.set(buffer);
           const value = decodeValue(reader);
           if (reader.pos !== reader.bytes.length) {
-            throw new RangeError(`Extra ${reader.bytes.length - reader.pos} of ${reader.bytes.length} byte(s) found at buffer[${reader.pos}]`);
+            throw new RangeError(
+              `Extra ${reader.bytes.length - reader.pos} of ${reader.bytes.length} byte(s) found at buffer[${reader.pos}]`
+            );
           }
           return value;
         } finally {
@@ -1026,7 +1068,7 @@
       }
       *decodeMulti(buffer) {
         if (this.entered) {
-          yield* new Decoder(this.options).decodeMulti(buffer);
+          yield* new _Decoder(this.options).decodeMulti(buffer);
           return;
         }
         this.entered = true;
@@ -1044,7 +1086,7 @@
       }
       async decodeAsync(stream) {
         if (this.entered) {
-          return new Decoder(this.options).decodeAsync(stream);
+          return new _Decoder(this.options).decodeAsync(stream);
         }
         this.entered = true;
         try {
@@ -1076,7 +1118,9 @@
             }
             return object;
           }
-          throw new RangeError(`Insufficient data in parsing ${prettyByte(reader.head)} at ${totalPos} (${reader.pos} in the current buffer)`);
+          throw new RangeError(
+            `Insufficient data in parsing ${prettyByte(reader.head)} at ${totalPos} (${reader.pos} in the current buffer)`
+          );
         } finally {
           this.entered = false;
         }
@@ -1087,9 +1131,9 @@
       decodeStream(stream) {
         return this.decodeMultiAsync(stream, false);
       }
-      async* decodeMultiAsync(stream, isArray) {
+      async *decodeMultiAsync(stream, isArray) {
         if (this.entered) {
-          yield* new Decoder(this.options).decodeMultiAsync(stream, isArray);
+          yield* new _Decoder(this.options).decodeMultiAsync(stream, isArray);
           return;
         }
         this.entered = true;
@@ -1129,7 +1173,7 @@
           this.entered = false;
         }
       }
-    }
+    };
     function decode(buffer, options) {
       const settings = resolveDecoderSettings(options);
       if (!sharedReaderEntered) {
@@ -1140,7 +1184,9 @@
           sharedReader.set(buffer);
           const value = decodeValue(sharedReader);
           if (sharedReader.pos !== sharedReader.bytes.length) {
-            throw new RangeError(`Extra ${sharedReader.bytes.length - sharedReader.pos} of ${sharedReader.bytes.length} byte(s) found at buffer[${sharedReader.pos}]`);
+            throw new RangeError(
+              `Extra ${sharedReader.bytes.length - sharedReader.pos} of ${sharedReader.bytes.length} byte(s) found at buffer[${sharedReader.pos}]`
+            );
           }
           return value;
         } finally {
@@ -1149,24 +1195,31 @@
       }
       return new Decoder(options).decode(buffer);
     }
+    __name(decode, "decode");
     function decodeMulti(buffer, options) {
       return new Decoder(options).decodeMulti(buffer);
     }
+    __name(decodeMulti, "decodeMulti");
     function decodeAsync(streamLike, options) {
       return new Decoder(options).decodeAsync(ensureAsyncIterable(streamLike));
     }
+    __name(decodeAsync, "decodeAsync");
     function decodeArrayStream(streamLike, options) {
       return new Decoder(options).decodeArrayStream(ensureAsyncIterable(streamLike));
     }
+    __name(decodeArrayStream, "decodeArrayStream");
     function decodeMultiStream(streamLike, options) {
       return new Decoder(options).decodeStream(ensureAsyncIterable(streamLike));
     }
+    __name(decodeMultiStream, "decodeMultiStream");
     function prettyByte(byte) {
       return `${byte < 0 ? "-" : ""}0x${Math.abs(byte).toString(16).padStart(2, "0")}`;
     }
+    __name(prettyByte, "prettyByte");
     function createExtraByteError(viewLength, pos, posToShow) {
       return new RangeError(`Extra ${viewLength - pos} of ${viewLength} byte(s) found at buffer[${posToShow}]`);
     }
+    __name(createExtraByteError, "createExtraByteError");
     function readArraySize(reader) {
       const head = reader.view.getUint8(reader.pos);
       reader.pos++;
@@ -1183,37 +1236,44 @@
           throw new DecodeError(`Unrecognized array type byte: ${prettyByte(head)}`);
       }
     }
+    __name(readArraySize, "readArraySize");
     function readU16(reader) {
       const value = reader.view.getUint16(reader.pos);
       reader.pos += 2;
       return value;
     }
+    __name(readU16, "readU16");
     function readU32(reader) {
       const value = reader.view.getUint32(reader.pos);
       reader.pos += 4;
       return value;
     }
+    __name(readU32, "readU32");
     function stateIsMapKey(reader) {
       return reader.stackLength > 0 && reader.stack[reader.stackLength - 1].type === STATE_MAP_KEY;
     }
+    __name(stateIsMapKey, "stateIsMapKey");
     function completeHead(reader) {
       if (reader.trackHead) {
         reader.head = HEAD_BYTE_REQUIRED;
       }
     }
+    __name(completeHead, "completeHead");
     function pushArrayState(reader, size) {
       if (size > reader.settings.maxArrayLength) {
-        throw new DecodeError(`Max length exceeded: array length (${size}) > maxArrayLength (${reader.settings.maxArrayLength})`);
+        throw new DecodeError(
+          `Max length exceeded: array length (${size}) > maxArrayLength (${reader.settings.maxArrayLength})`
+        );
       }
       const depth = reader.stackLength++;
       let state = reader.stack[depth];
-      if (state === undefined) {
+      if (state === void 0) {
         state = {
           type: STATE_ARRAY,
           size: 0,
-          array: undefined,
+          array: void 0,
           position: 0,
-          map: undefined,
+          map: void 0,
           key: null,
           readCount: 0
         };
@@ -1224,19 +1284,22 @@
       state.array = new Array(size);
       state.position = 0;
     }
+    __name(pushArrayState, "pushArrayState");
     function pushMapState(reader, size) {
       if (size > reader.settings.maxMapLength) {
-        throw new DecodeError(`Max length exceeded: map length (${size}) > maxMapLengthLength (${reader.settings.maxMapLength})`);
+        throw new DecodeError(
+          `Max length exceeded: map length (${size}) > maxMapLengthLength (${reader.settings.maxMapLength})`
+        );
       }
       const depth = reader.stackLength++;
       let state = reader.stack[depth];
-      if (state === undefined) {
+      if (state === void 0) {
         state = {
           type: STATE_MAP_KEY,
           size: 0,
-          array: undefined,
+          array: void 0,
           position: 0,
-          map: undefined,
+          map: void 0,
           key: null,
           readCount: 0
         };
@@ -1248,287 +1311,419 @@
       state.key = null;
       state.readCount = 0;
     }
+    __name(pushMapState, "pushMapState");
+    function fillScalarArray(reader) {
+      const state = reader.stack[reader.stackLength - 1];
+      const array = state.array;
+      if (array === void 0) {
+        return void 0;
+      }
+      const bytes = reader.bytes;
+      const view = reader.view;
+      const size = state.size;
+      const end = bytes.length;
+      let position = state.position;
+      let pos = reader.pos;
+      SCALARS: while (position < size) {
+        if (pos >= end) {
+          break;
+        }
+        const head = bytes[pos];
+        if (head < 128) {
+          array[position++] = head;
+          pos += 1;
+          continue;
+        }
+        if (head >= 224) {
+          array[position++] = head - 256;
+          pos += 1;
+          continue;
+        }
+        switch (head) {
+          case 192:
+            array[position++] = null;
+            pos += 1;
+            break;
+          case 194:
+            array[position++] = false;
+            pos += 1;
+            break;
+          case 195:
+            array[position++] = true;
+            pos += 1;
+            break;
+          case 202:
+            if (end - pos < 5) {
+              break SCALARS;
+            }
+            array[position++] = view.getFloat32(pos + 1);
+            pos += 5;
+            break;
+          case 203:
+            if (end - pos < 9) {
+              break SCALARS;
+            }
+            array[position++] = view.getFloat64(pos + 1);
+            pos += 9;
+            break;
+          case 204:
+            if (end - pos < 2) {
+              break SCALARS;
+            }
+            array[position++] = view.getUint8(pos + 1);
+            pos += 2;
+            break;
+          case 205:
+            if (end - pos < 3) {
+              break SCALARS;
+            }
+            array[position++] = view.getUint16(pos + 1);
+            pos += 3;
+            break;
+          case 206:
+            if (end - pos < 5) {
+              break SCALARS;
+            }
+            array[position++] = view.getUint32(pos + 1);
+            pos += 5;
+            break;
+          case 208:
+            if (end - pos < 2) {
+              break SCALARS;
+            }
+            array[position++] = view.getInt8(pos + 1);
+            pos += 2;
+            break;
+          case 209:
+            if (end - pos < 3) {
+              break SCALARS;
+            }
+            array[position++] = view.getInt16(pos + 1);
+            pos += 3;
+            break;
+          case 210:
+            if (end - pos < 5) {
+              break SCALARS;
+            }
+            array[position++] = view.getInt32(pos + 1);
+            pos += 5;
+            break;
+          default:
+            break SCALARS;
+        }
+      }
+      reader.pos = pos;
+      state.position = position;
+      if (position === size) {
+        const completed = array;
+        state.array = void 0;
+        reader.stackLength--;
+        return completed;
+      }
+      return void 0;
+    }
+    __name(fillScalarArray, "fillScalarArray");
     function decodeValue(reader) {
       const stack = reader.stack;
-      DECODE:
-        while (true) {
-          let head;
-          if (reader.head !== HEAD_BYTE_REQUIRED) {
-            head = reader.head;
-          } else {
-            head = reader.view.getUint8(reader.pos);
-            reader.pos++;
-            if (reader.trackHead) {
-              reader.head = head;
-            }
+      DECODE: while (true) {
+        let head;
+        if (reader.head !== HEAD_BYTE_REQUIRED) {
+          head = reader.head;
+        } else {
+          head = reader.view.getUint8(reader.pos);
+          reader.pos++;
+          if (reader.trackHead) {
+            reader.head = head;
           }
-          let object;
-          if (head < 128) {
-            object = head;
-          } else if (head >= 224) {
-            object = head - 256;
-          } else if (head < 144) {
-            const size = head - 128;
-            if (size !== 0) {
-              pushMapState(reader, size);
-              completeHead(reader);
+        }
+        let object;
+        if (head < 128) {
+          object = head;
+        } else if (head >= 224) {
+          object = head - 256;
+        } else if (head < 144) {
+          const size = head - 128;
+          if (size !== 0) {
+            pushMapState(reader, size);
+            completeHead(reader);
+            continue DECODE;
+          }
+          object = {};
+        } else if (head < 160) {
+          const size = head - 144;
+          if (size !== 0) {
+            pushArrayState(reader, size);
+            completeHead(reader);
+            const filled = fillScalarArray(reader);
+            if (filled === void 0) {
               continue DECODE;
             }
-            object = {};
-          } else if (head < 160) {
-            const size = head - 144;
-            if (size !== 0) {
-              pushArrayState(reader, size);
-              completeHead(reader);
-              continue DECODE;
-            }
-            object = [];
-          } else if (head < 192) {
-            object = decodeString(reader, head - 160, stateIsMapKey(reader), 0);
+            object = filled;
           } else {
-            switch (head) {
-              case 192:
-                object = null;
-                break;
-              case 194:
-                object = false;
-                break;
-              case 195:
-                object = true;
-                break;
-              case 202: {
-                const value = reader.view.getFloat32(reader.pos);
-                reader.pos += 4;
-                object = value;
-                break;
-              }
-              case 203: {
-                const value = reader.view.getFloat64(reader.pos);
+            object = [];
+          }
+        } else if (head < 192) {
+          object = decodeString(reader, head - 160, stateIsMapKey(reader), 0);
+        } else {
+          switch (head) {
+            case 192:
+              object = null;
+              break;
+            case 194:
+              object = false;
+              break;
+            case 195:
+              object = true;
+              break;
+            case 202: {
+              const value = reader.view.getFloat32(reader.pos);
+              reader.pos += 4;
+              object = value;
+              break;
+            }
+            case 203: {
+              const value = reader.view.getFloat64(reader.pos);
+              reader.pos += 8;
+              object = value;
+              break;
+            }
+            case 204: {
+              const value = reader.view.getUint8(reader.pos);
+              reader.pos++;
+              object = value;
+              break;
+            }
+            case 205: {
+              const value = reader.view.getUint16(reader.pos);
+              reader.pos += 2;
+              object = value;
+              break;
+            }
+            case 206: {
+              const value = reader.view.getUint32(reader.pos);
+              reader.pos += 4;
+              object = value;
+              break;
+            }
+            case 207: {
+              if (reader.settings.useBigInt64) {
+                const value = reader.view.getBigUint64(reader.pos);
                 reader.pos += 8;
                 object = value;
-                break;
-              }
-              case 204: {
-                const value = reader.view.getUint8(reader.pos);
-                reader.pos++;
-                object = value;
-                break;
-              }
-              case 205: {
-                const value = reader.view.getUint16(reader.pos);
-                reader.pos += 2;
-                object = value;
-                break;
-              }
-              case 206: {
-                const value = reader.view.getUint32(reader.pos);
-                reader.pos += 4;
-                object = value;
-                break;
-              }
-              case 207: {
-                if (reader.settings.useBigInt64) {
-                  const value = reader.view.getBigUint64(reader.pos);
-                  reader.pos += 8;
-                  object = value;
-                } else {
-                  const high = reader.view.getUint32(reader.pos);
-                  const low = reader.view.getUint32(reader.pos + 4);
-                  reader.pos += 8;
-                  object = high * 4294967296 + low;
-                }
-                break;
-              }
-              case 208: {
-                const value = reader.view.getInt8(reader.pos);
-                reader.pos += 1;
-                object = value;
-                break;
-              }
-              case 209: {
-                const value = reader.view.getInt16(reader.pos);
-                reader.pos += 2;
-                object = value;
-                break;
-              }
-              case 210: {
-                const value = reader.view.getInt32(reader.pos);
-                reader.pos += 4;
-                object = value;
-                break;
-              }
-              case 211: {
-                if (reader.settings.useBigInt64) {
-                  const value = reader.view.getBigInt64(reader.pos);
-                  reader.pos += 8;
-                  object = value;
-                } else {
-                  const high = reader.view.getInt32(reader.pos);
-                  const low = reader.view.getUint32(reader.pos + 4);
-                  reader.pos += 8;
-                  object = high * 4294967296 + low;
-                }
-                break;
-              }
-              case 217: {
-                const length = reader.view.getUint8(reader.pos);
-                object = decodeString(reader, length, stateIsMapKey(reader), 1);
-                break;
-              }
-              case 218: {
-                const length = reader.view.getUint16(reader.pos);
-                object = decodeString(reader, length, stateIsMapKey(reader), 2);
-                break;
-              }
-              case 219: {
-                const length = reader.view.getUint32(reader.pos);
-                object = decodeString(reader, length, stateIsMapKey(reader), 4);
-                break;
-              }
-              case 220: {
-                const size = readU16(reader);
-                if (size !== 0) {
-                  pushArrayState(reader, size);
-                  completeHead(reader);
-                  continue DECODE;
-                }
-                object = [];
-                break;
-              }
-              case 221: {
-                const size = readU32(reader);
-                if (size !== 0) {
-                  pushArrayState(reader, size);
-                  completeHead(reader);
-                  continue DECODE;
-                }
-                object = [];
-                break;
-              }
-              case 222: {
-                const size = readU16(reader);
-                if (size !== 0) {
-                  pushMapState(reader, size);
-                  completeHead(reader);
-                  continue DECODE;
-                }
-                object = {};
-                break;
-              }
-              case 223: {
-                const size = readU32(reader);
-                if (size !== 0) {
-                  pushMapState(reader, size);
-                  completeHead(reader);
-                  continue DECODE;
-                }
-                object = {};
-                break;
-              }
-              case 196: {
-                const size = reader.view.getUint8(reader.pos);
-                object = decodeBinary(reader, size, 1);
-                break;
-              }
-              case 197: {
-                const size = reader.view.getUint16(reader.pos);
-                object = decodeBinary(reader, size, 2);
-                break;
-              }
-              case 198: {
-                const size = reader.view.getUint32(reader.pos);
-                object = decodeBinary(reader, size, 4);
-                break;
-              }
-              case 212:
-                object = decodeExtension(reader, 1, 0);
-                break;
-              case 213:
-                object = decodeExtension(reader, 2, 0);
-                break;
-              case 214:
-                object = decodeExtension(reader, 4, 0);
-                break;
-              case 215:
-                object = decodeExtension(reader, 8, 0);
-                break;
-              case 216:
-                object = decodeExtension(reader, 16, 0);
-                break;
-              case 199: {
-                const size = reader.view.getUint8(reader.pos);
-                object = decodeExtension(reader, size, 1);
-                break;
-              }
-              case 200: {
-                const size = reader.view.getUint16(reader.pos);
-                object = decodeExtension(reader, size, 2);
-                break;
-              }
-              case 201: {
-                const size = reader.view.getUint32(reader.pos);
-                object = decodeExtension(reader, size, 4);
-                break;
-              }
-              default:
-                throw new DecodeError(`Unrecognized type byte: ${prettyByte(head)}`);
-            }
-          }
-          completeHead(reader);
-          while (reader.stackLength > 0) {
-            const state = stack[reader.stackLength - 1];
-            if (state.type === STATE_ARRAY) {
-              const array = state.array;
-              array[state.position] = object;
-              state.position++;
-              if (state.position === state.size) {
-                object = array;
-                state.array = undefined;
-                reader.stackLength--;
               } else {
+                const high = reader.view.getUint32(reader.pos);
+                const low = reader.view.getUint32(reader.pos + 4);
+                reader.pos += 8;
+                object = high * 4294967296 + low;
+              }
+              break;
+            }
+            case 208: {
+              const value = reader.view.getInt8(reader.pos);
+              reader.pos += 1;
+              object = value;
+              break;
+            }
+            case 209: {
+              const value = reader.view.getInt16(reader.pos);
+              reader.pos += 2;
+              object = value;
+              break;
+            }
+            case 210: {
+              const value = reader.view.getInt32(reader.pos);
+              reader.pos += 4;
+              object = value;
+              break;
+            }
+            case 211: {
+              if (reader.settings.useBigInt64) {
+                const value = reader.view.getBigInt64(reader.pos);
+                reader.pos += 8;
+                object = value;
+              } else {
+                const high = reader.view.getInt32(reader.pos);
+                const low = reader.view.getUint32(reader.pos + 4);
+                reader.pos += 8;
+                object = high * 4294967296 + low;
+              }
+              break;
+            }
+            case 217: {
+              const length = reader.view.getUint8(reader.pos);
+              object = decodeString(reader, length, stateIsMapKey(reader), 1);
+              break;
+            }
+            case 218: {
+              const length = reader.view.getUint16(reader.pos);
+              object = decodeString(reader, length, stateIsMapKey(reader), 2);
+              break;
+            }
+            case 219: {
+              const length = reader.view.getUint32(reader.pos);
+              object = decodeString(reader, length, stateIsMapKey(reader), 4);
+              break;
+            }
+            case 220: {
+              const size = readU16(reader);
+              if (size !== 0) {
+                pushArrayState(reader, size);
+                completeHead(reader);
+                const filled = fillScalarArray(reader);
+                if (filled === void 0) {
+                  continue DECODE;
+                }
+                object = filled;
+              } else {
+                object = [];
+              }
+              break;
+            }
+            case 221: {
+              const size = readU32(reader);
+              if (size !== 0) {
+                pushArrayState(reader, size);
+                completeHead(reader);
+                const filled = fillScalarArray(reader);
+                if (filled === void 0) {
+                  continue DECODE;
+                }
+                object = filled;
+              } else {
+                object = [];
+              }
+              break;
+            }
+            case 222: {
+              const size = readU16(reader);
+              if (size !== 0) {
+                pushMapState(reader, size);
+                completeHead(reader);
                 continue DECODE;
               }
-            } else if (state.type === STATE_MAP_KEY) {
-              if (object === "__proto__") {
-                throw new DecodeError("The key __proto__ is not allowed");
-              }
-              state.key = reader.settings.mapKeyConverter(object);
-              state.type = STATE_MAP_VALUE;
-              continue DECODE;
-            } else {
-              const map = state.map;
-              map[state.key] = object;
-              state.readCount++;
-              if (state.readCount === state.size) {
-                object = map;
-                state.map = undefined;
-                reader.stackLength--;
-              } else {
-                state.key = null;
-                state.type = STATE_MAP_KEY;
+              object = {};
+              break;
+            }
+            case 223: {
+              const size = readU32(reader);
+              if (size !== 0) {
+                pushMapState(reader, size);
+                completeHead(reader);
                 continue DECODE;
               }
+              object = {};
+              break;
             }
+            case 196: {
+              const size = reader.view.getUint8(reader.pos);
+              object = decodeBinary(reader, size, 1);
+              break;
+            }
+            case 197: {
+              const size = reader.view.getUint16(reader.pos);
+              object = decodeBinary(reader, size, 2);
+              break;
+            }
+            case 198: {
+              const size = reader.view.getUint32(reader.pos);
+              object = decodeBinary(reader, size, 4);
+              break;
+            }
+            case 212:
+              object = decodeExtension(reader, 1, 0);
+              break;
+            case 213:
+              object = decodeExtension(reader, 2, 0);
+              break;
+            case 214:
+              object = decodeExtension(reader, 4, 0);
+              break;
+            case 215:
+              object = decodeExtension(reader, 8, 0);
+              break;
+            case 216:
+              object = decodeExtension(reader, 16, 0);
+              break;
+            case 199: {
+              const size = reader.view.getUint8(reader.pos);
+              object = decodeExtension(reader, size, 1);
+              break;
+            }
+            case 200: {
+              const size = reader.view.getUint16(reader.pos);
+              object = decodeExtension(reader, size, 2);
+              break;
+            }
+            case 201: {
+              const size = reader.view.getUint32(reader.pos);
+              object = decodeExtension(reader, size, 4);
+              break;
+            }
+            default:
+              throw new DecodeError(`Unrecognized type byte: ${prettyByte(head)}`);
           }
-          return object;
         }
+        completeHead(reader);
+        while (reader.stackLength > 0) {
+          const state = stack[reader.stackLength - 1];
+          if (state.type === STATE_ARRAY) {
+            const array = state.array;
+            array[state.position] = object;
+            state.position++;
+            if (state.position === state.size) {
+              object = array;
+              state.array = void 0;
+              reader.stackLength--;
+            } else {
+              continue DECODE;
+            }
+          } else if (state.type === STATE_MAP_KEY) {
+            if (object === "__proto__") {
+              throw new DecodeError("The key __proto__ is not allowed");
+            }
+            state.key = reader.settings.mapKeyConverter(object);
+            state.type = STATE_MAP_VALUE;
+            continue DECODE;
+          } else {
+            const map = state.map;
+            map[state.key] = object;
+            state.readCount++;
+            if (state.readCount === state.size) {
+              object = map;
+              state.map = void 0;
+              reader.stackLength--;
+            } else {
+              state.key = null;
+              state.type = STATE_MAP_KEY;
+              continue DECODE;
+            }
+          }
+        }
+        return object;
+      }
     }
+    __name(decodeValue, "decodeValue");
     function decodeExtension(reader, size, headerOffset) {
       const settings = reader.settings;
       if (size > settings.maxExtLength) {
-        throw new DecodeError(`Max length exceeded: ext length (${size}) > maxExtLength (${settings.maxExtLength})`);
+        throw new DecodeError(
+          `Max length exceeded: ext length (${size}) > maxExtLength (${settings.maxExtLength})`
+        );
       }
       const type = reader.view.getInt8(reader.pos + headerOffset);
       const data = decodeBinary(reader, size, headerOffset + 1);
       return settings.extensionCodec.decode(data, type, settings.context);
     }
+    __name(decodeExtension, "decodeExtension");
     function decodeString(reader, length, isMapKey, headerOffset) {
       const settings = reader.settings;
       if (settings.rawStrings && !isMapKey) {
         return decodeBinary(reader, length, headerOffset);
       }
       if (length > settings.maxStrLength) {
-        throw new DecodeError(`Max length exceeded: UTF-8 byte length (${length}) > maxStrLength (${settings.maxStrLength})`);
+        throw new DecodeError(
+          `Max length exceeded: UTF-8 byte length (${length}) > maxStrLength (${settings.maxStrLength})`
+        );
       }
       if (length > reader.bytes.length - reader.pos - headerOffset) {
         throw new RangeError("Insufficient data");
@@ -1540,9 +1735,12 @@
       }
       return readUtf8(reader.bytes, start, length);
     }
+    __name(decodeString, "decodeString");
     function decodeBinary(reader, size, headerOffset) {
       if (size > reader.settings.maxBinLength) {
-        throw new DecodeError(`Max length exceeded: bin length (${size}) > maxBinLength (${reader.settings.maxBinLength})`);
+        throw new DecodeError(
+          `Max length exceeded: bin length (${size}) > maxBinLength (${reader.settings.maxBinLength})`
+        );
       }
       if (size > reader.bytes.length - reader.pos - headerOffset) {
         throw new RangeError("Insufficient data");
@@ -1551,9 +1749,10 @@
       reader.pos = start + size;
       return reader.bytes.subarray(start, start + size);
     }
+    __name(decodeBinary, "decodeBinary");
 
     // packages/msgpack/src/index.ts
-    var src_default = {
+    var index_default = {
       encode,
       Encoder,
       decode,

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
+import { installDependencies, runCommand } from "./command.ts";
 
 /**
  * Adopts the replacement in an application bundled by traditional build
@@ -15,7 +16,7 @@ import { dirname, join, relative } from "node:path";
  * identical.
  */
 
-const root = dirname(import.meta.dir);
+const root = dirname(import.meta.dirname);
 const appDir = join(root, "examples/classic-bundler");
 const packageDir = join(root, "packages/msgpack");
 const appName = appDir.slice(appDir.lastIndexOf("/") + 1);
@@ -61,10 +62,7 @@ async function makeApp(variant: "baseline" | "replacement"): Promise<string> {
     recursive: true,
     filter: (source) => {
       const rel = relative(appDir, source);
-      return (
-        rel === "" ||
-        (!rel.startsWith("node_modules") && !rel.startsWith("dist") && rel !== "bun.lock")
-      );
+      return rel === "" || (!rel.startsWith("node_modules") && !rel.startsWith("dist"));
     },
   });
 
@@ -84,40 +82,27 @@ async function makeApp(variant: "baseline" | "replacement"): Promise<string> {
   }
   await writeFile(join(dir, "package.json"), JSON.stringify(manifest, null, 2) + "\n");
 
-  const result = Bun.spawnSync(["bun", "install", "--silent"], {
-    cwd: dir,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  if (result.exitCode !== 0) {
-    throw new Error(`bun install failed for ${variant}: ${result.stderr.toString()}`);
-  }
+  installDependencies(dir, variant);
   return dir;
 }
 
 async function build(dir: string): Promise<{ exitCode: number; output: string }> {
   await rm(join(dir, "dist"), { recursive: true, force: true });
   await mkdir(join(dir, "dist"), { recursive: true });
-  const result = Bun.spawnSync(
-    [join(dir, "node_modules", ".bin", "browserify"), "src/app.js", "-o", "dist/app.js"],
-    { cwd: dir, stdout: "pipe", stderr: "pipe" },
+  return runCommand(
+    [
+      process.execPath,
+      join(dir, "node_modules", "browserify", "bin", "cmd.js"),
+      "src/app.js",
+      "-o",
+      "dist/app.js",
+    ],
+    dir,
   );
-  return {
-    exitCode: result.exitCode ?? -1,
-    output: `${result.stdout.toString()}${result.stderr.toString()}`.trim(),
-  };
 }
 
 function execute(dir: string): { exitCode: number; output: string } {
-  const result = Bun.spawnSync(["node", "dist/app.js"], {
-    cwd: dir,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  return {
-    exitCode: result.exitCode ?? -1,
-    output: `${result.stdout.toString()}${result.stderr.toString()}`.trim(),
-  };
+  return runCommand([process.execPath, "dist/app.js"], dir);
 }
 
 interface AdoptedRun {

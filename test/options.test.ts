@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import assert from "node:assert/strict";
+import { describe, test } from "node:test";
 import {
   decode as referenceDecode,
   decodeMulti as referenceDecodeMulti,
@@ -13,7 +14,7 @@ import {
   encode,
   Encoder,
   ExtensionCodec,
-} from "../packages/msgpack/src/index.ts";
+} from "@dsdenes/msgpack";
 import { customPayloads, installExtensionCodec, timestampPayloads } from "./extensions.ts";
 
 const referenceCodec = new ReferenceExtensionCodec();
@@ -240,9 +241,9 @@ describe("encoding options match msgpack-javascript", () => {
         ? { ...item.options, extensionCodec: referenceCodec }
         : item.options;
       const expected = referenceEncode(item.value, referenceOptions as never);
-      expect(hex(encode(item.value, item.options))).toBe(hex(expected));
-      expect(hex(new Encoder(item.options).encode(item.value))).toBe(hex(expected));
-      expect(hex(new Encoder(item.options).encodeSharedRef(item.value))).toBe(hex(expected));
+      assert.strictEqual(hex(encode(item.value, item.options)), hex(expected));
+      assert.strictEqual(hex(new Encoder(item.options).encode(item.value)), hex(expected));
+      assert.strictEqual(hex(new Encoder(item.options).encodeSharedRef(item.value)), hex(expected));
     });
   }
 
@@ -252,9 +253,10 @@ describe("encoding options match msgpack-javascript", () => {
         for (const value of [nestedArray(depth), nestedMap(depth)]) {
           const expectedError = captureError(() => referenceEncode(value, { maxDepth: limit }));
           const actualError = captureError(() => encode(value, { maxDepth: limit }));
-          expect(actualError).toEqual(expectedError);
+          assert.deepStrictEqual(actualError, expectedError);
           if (expectedError === null) {
-            expect(hex(encode(value, { maxDepth: limit }))).toBe(
+            assert.strictEqual(
+              hex(encode(value, { maxDepth: limit })),
               hex(referenceEncode(value, { maxDepth: limit })),
             );
           }
@@ -274,7 +276,8 @@ describe("encoding options match msgpack-javascript", () => {
         useBigInt64: true,
       };
       const referenceOptions = { ...options, extensionCodec: referenceCodec };
-      expect(hex(encode(payload.value, options))).toBe(
+      assert.strictEqual(
+        hex(encode(payload.value, options)),
         hex(referenceEncode(payload.value, referenceOptions as never)),
       );
     }
@@ -371,7 +374,8 @@ describe("decoding options match msgpack-javascript", () => {
 
   test("useBigInt64 converts 64-bit map keys to bigint keys", () => {
     const bytes = new Uint8Array([0x81, 0xcf, 0, 0, 0, 0, 0, 0, 0, 1, 0x01]);
-    expect(captureError(() => referenceDecode(bytes, { useBigInt64: true }))).toEqual(
+    assert.deepStrictEqual(
+      captureError(() => referenceDecode(bytes, { useBigInt64: true })),
       captureError(() => decode(bytes, { useBigInt64: true })),
     );
     const options: Options = {
@@ -389,10 +393,10 @@ describe("decoding options match msgpack-javascript", () => {
     const bytes = new Uint8Array([0x81, 0x90, 0x01]);
     const expected = captureError(() => referenceDecode(bytes));
     const actual = captureError(() => decode(bytes));
-    expect(actual).toEqual(expected);
-    expect(actual?.name).toBe("DecodeError");
-    expect(decode(bytes, { mapKeyConverter: () => "array" })).toEqual({ array: 1 });
-    expect(new DecodeError("x").name).toBe("DecodeError");
+    assert.deepStrictEqual(actual, expected);
+    assert.strictEqual(actual?.name, "DecodeError");
+    assert.deepStrictEqual(decode(bytes, { mapKeyConverter: () => "array" }), { array: 1 });
+    assert.strictEqual(new DecodeError("x").name, "DecodeError");
   });
 
   test("custom and disabled key decoders", () => {
@@ -418,7 +422,7 @@ describe("decoding options match msgpack-javascript", () => {
       const expected = referenceDecode(bytes, { keyDecoder: referenceKeyDecoder });
       const actual = decode(bytes, { keyDecoder: replacementKeyDecoder });
       assertSameValue(actual, expected);
-      expect(replacementCalls).toBe(referenceCalls);
+      assert.strictEqual(replacementCalls, referenceCalls);
     }
 
     assertSameValue(
@@ -437,7 +441,8 @@ describe("decoder maximum length options", () => {
         }
         const bytes = referenceEncode("a".repeat(length));
         const options = { maxStrLength: limit };
-        expect(captureError(() => decode(bytes, options))).toEqual(
+        assert.deepStrictEqual(
+          captureError(() => decode(bytes, options)),
           captureError(() => referenceDecode(bytes, options)),
         );
       }
@@ -445,7 +450,8 @@ describe("decoder maximum length options", () => {
 
     for (const [value, limit] of [["é", 1], ["é", 2], ["日本語", 8], ["日本語", 9]] as const) {
       const bytes = referenceEncode(value);
-      expect(captureError(() => decode(bytes, { maxStrLength: limit }))).toEqual(
+      assert.deepStrictEqual(
+        captureError(() => decode(bytes, { maxStrLength: limit })),
         captureError(() => referenceDecode(bytes, { maxStrLength: limit })),
       );
     }
@@ -454,7 +460,8 @@ describe("decoder maximum length options", () => {
   test("maxStrLength applies to map keys", () => {
     const bytes = referenceEncode({ longkey: 1, a: 2 });
     for (const limit of [1, 6, 7]) {
-      expect(captureError(() => decode(bytes, { maxStrLength: limit }))).toEqual(
+      assert.deepStrictEqual(
+        captureError(() => decode(bytes, { maxStrLength: limit })),
         captureError(() => referenceDecode(bytes, { maxStrLength: limit })),
       );
     }
@@ -468,7 +475,8 @@ describe("decoder maximum length options", () => {
         }
         const bytes = referenceEncode(new Uint8Array(length).fill(7));
         const options = { maxBinLength: limit };
-        expect(captureError(() => decode(bytes, options))).toEqual(
+        assert.deepStrictEqual(
+          captureError(() => decode(bytes, options)),
           captureError(() => referenceDecode(bytes, options)),
         );
       }
@@ -477,18 +485,23 @@ describe("decoder maximum length options", () => {
 
   test("raw strings are limited by maxBinLength, not maxStrLength", () => {
     const bytes = referenceEncode("abcdef");
-    expect(captureError(() => decode(bytes, { rawStrings: true, maxBinLength: 5 }))).toEqual(
+    assert.deepStrictEqual(
+      captureError(() => decode(bytes, { rawStrings: true, maxBinLength: 5 })),
       captureError(() => referenceDecode(bytes, { rawStrings: true, maxBinLength: 5 })),
     );
-    expect(captureError(() => decode(bytes, { rawStrings: true, maxStrLength: 0 }))).toBeNull();
-    expect(captureError(() => referenceDecode(bytes, { rawStrings: true, maxStrLength: 0 }))).toBeNull();
+    assert.strictEqual(captureError(() => decode(bytes, { rawStrings: true, maxStrLength: 0 })), null);
+    assert.strictEqual(
+      captureError(() => referenceDecode(bytes, { rawStrings: true, maxStrLength: 0 })),
+      null,
+    );
     assertSameValue(
       decode(bytes, { rawStrings: true, maxStrLength: 0 }),
       referenceDecode(bytes, { rawStrings: true, maxStrLength: 0 }),
     );
 
     const keyed = referenceEncode({ abcdef: 1 });
-    expect(captureError(() => decode(keyed, { rawStrings: true, maxStrLength: 5 }))).toEqual(
+    assert.deepStrictEqual(
+      captureError(() => decode(keyed, { rawStrings: true, maxStrLength: 5 })),
       captureError(() => referenceDecode(keyed, { rawStrings: true, maxStrLength: 5 })),
     );
   });
@@ -501,7 +514,8 @@ describe("decoder maximum length options", () => {
         }
         const bytes = referenceEncode(Array.from({ length }, (_, i) => i));
         const options = { maxArrayLength: limit };
-        expect(captureError(() => decode(bytes, options))).toEqual(
+        assert.deepStrictEqual(
+          captureError(() => decode(bytes, options)),
           captureError(() => referenceDecode(bytes, options)),
         );
       }
@@ -520,7 +534,8 @@ describe("decoder maximum length options", () => {
         }
         const bytes = referenceEncode(value);
         const options = { maxMapLength: limit };
-        expect(captureError(() => decode(bytes, options))).toEqual(
+        assert.deepStrictEqual(
+          captureError(() => decode(bytes, options)),
           captureError(() => referenceDecode(bytes, options)),
         );
       }
@@ -533,7 +548,8 @@ describe("decoder maximum length options", () => {
       for (const limit of [0, 1, 2, 3, 4, 7, 8, 11, 12, 16]) {
         const options = { maxBinLength: limit, extensionCodec: replacementCodec };
         const referenceOptions = { maxBinLength: limit, extensionCodec: referenceCodec };
-        expect(captureError(() => decode(bytes, options))).toEqual(
+        assert.deepStrictEqual(
+          captureError(() => decode(bytes, options)),
           captureError(() => referenceDecode(bytes, referenceOptions)),
         );
       }
@@ -552,7 +568,8 @@ describe("decoder maximum length options", () => {
       for (const limit of [0, 1, 2, 3, 4, 7, 8, 11, 12, 16, 255, 256]) {
         const options = { maxExtLength: limit, extensionCodec: replacementCodec };
         const referenceOptions = { maxExtLength: limit, extensionCodec: referenceCodec };
-        expect(captureError(() => decode(bytes, options))).toEqual(
+        assert.deepStrictEqual(
+          captureError(() => decode(bytes, options)),
           captureError(() => referenceDecode(bytes, referenceOptions)),
         );
       }
@@ -570,9 +587,9 @@ describe("no-option behavior is unchanged", () => {
   };
 
   test("encoding without options still matches the reference", () => {
-    expect(hex(encode(value))).toBe(hex(referenceEncode(value)));
-    expect(hex(new Encoder().encode(value))).toBe(hex(referenceEncode(value)));
-    expect(hex(new Encoder().encodeSharedRef(value))).toBe(hex(referenceEncode(value)));
+    assert.strictEqual(hex(encode(value)), hex(referenceEncode(value)));
+    assert.strictEqual(hex(new Encoder().encode(value)), hex(referenceEncode(value)));
+    assert.strictEqual(hex(new Encoder().encodeSharedRef(value)), hex(referenceEncode(value)));
   });
 
   test("decoding without options still matches the reference", () => {
@@ -614,11 +631,11 @@ function concatMessages(chunks: Uint8Array[]): Uint8Array {
 }
 
 function assertSameMultiOutcome(actual: MultiOutcome, expected: MultiOutcome, label: string): void {
-  expect(actual.error).toEqual(expected.error);
+  assert.deepStrictEqual(actual.error, expected.error);
   if (actual.error !== null) {
     return;
   }
-  expect(actual.values.length).toBe(expected.values.length);
+  assert.strictEqual(actual.values.length, expected.values.length);
   for (let i = 0; i < expected.values.length; i++) {
     assertSameValue(actual.values[i], expected.values[i], `${label} $[${i}]`);
   }

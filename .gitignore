@@ -3,8 +3,7 @@ dist/
 .worktree/
 .tmp/
 .env
-examples/*/dist-*/
-examples/*/bun.lock
+examples/*/dist-*
 .npm-cache/
 .npm-logs/
 

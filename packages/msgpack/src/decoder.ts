@@ -524,6 +524,131 @@ function pushMapState(reader: Reader, size: number): void {
 }
 
 /**
+ * Decodes the scalar elements of the array state on top of the stack directly
+ * into its array. Flat arrays of numbers, booleans, and nulls are common, and
+ * skipping the general value dispatcher for each element removes a head-byte
+ * dispatch, a stack lookup, and a container update per element. The run stops
+ * before any element that is not a complete scalar, so the general decoder
+ * keeps producing the reference's errors for truncated and nested input.
+ * Returns the completed array, or undefined when the general decoder must
+ * handle the next element.
+ */
+function fillScalarArray(reader: Reader): unknown[] | undefined {
+  const state = reader.stack[reader.stackLength - 1];
+  const array = state.array;
+  if (array === undefined) {
+    return undefined;
+  }
+  const bytes = reader.bytes;
+  const view = reader.view;
+  const size = state.size;
+  const end = bytes.length;
+  let position = state.position;
+  let pos = reader.pos;
+
+  SCALARS: while (position < size) {
+    if (pos >= end) {
+      break;
+    }
+    const head = bytes[pos];
+    if (head < 0x80) {
+      array[position++] = head;
+      pos += 1;
+      continue;
+    }
+    if (head >= 0xe0) {
+      array[position++] = head - 0x100;
+      pos += 1;
+      continue;
+    }
+    switch (head) {
+      case 0xc0:
+        array[position++] = null;
+        pos += 1;
+        break;
+      case 0xc2:
+        array[position++] = false;
+        pos += 1;
+        break;
+      case 0xc3:
+        array[position++] = true;
+        pos += 1;
+        break;
+      case 0xca:
+        if (end - pos < 5) {
+          break SCALARS;
+        }
+        array[position++] = view.getFloat32(pos + 1);
+        pos += 5;
+        break;
+      case 0xcb:
+        if (end - pos < 9) {
+          break SCALARS;
+        }
+        array[position++] = view.getFloat64(pos + 1);
+        pos += 9;
+        break;
+      case 0xcc:
+        if (end - pos < 2) {
+          break SCALARS;
+        }
+        array[position++] = view.getUint8(pos + 1);
+        pos += 2;
+        break;
+      case 0xcd:
+        if (end - pos < 3) {
+          break SCALARS;
+        }
+        array[position++] = view.getUint16(pos + 1);
+        pos += 3;
+        break;
+      case 0xce:
+        if (end - pos < 5) {
+          break SCALARS;
+        }
+        array[position++] = view.getUint32(pos + 1);
+        pos += 5;
+        break;
+      case 0xd0:
+        if (end - pos < 2) {
+          break SCALARS;
+        }
+        array[position++] = view.getInt8(pos + 1);
+        pos += 2;
+        break;
+      case 0xd1:
+        if (end - pos < 3) {
+          break SCALARS;
+        }
+        array[position++] = view.getInt16(pos + 1);
+        pos += 3;
+        break;
+      case 0xd2:
+        if (end - pos < 5) {
+          break SCALARS;
+        }
+        array[position++] = view.getInt32(pos + 1);
+        pos += 5;
+        break;
+      default:
+        // Strings, binaries, extensions, containers, and 64-bit integers go
+        // through the general decoder, which also owns their options.
+        break SCALARS;
+    }
+  }
+
+  reader.pos = pos;
+  state.position = position;
+  if (position === size) {
+    const completed = array;
+    state.array = undefined;
+    reader.stackLength--;
+    return completed;
+  }
+  return undefined;
+}
+
+/**
  * Decodes one complete message, iteratively. Container state lives on
  * `reader.stack`, so nesting depth is bounded by memory instead of by the
  * JavaScript call stack, exactly as in the reference implementation.
@@ -564,9 +689,14 @@ function decodeValue(reader: Reader): unknown {
       if (size !== 0) {
         pushArrayState(reader, size);
         completeHead(reader);
-        continue DECODE;
+        const filled = fillScalarArray(reader);
+        if (filled === undefined) {
+          continue DECODE;
+        }
+        object = filled;
+      } else {
+        object = [];
       }
-      object = [];
     } else if (head < 0xc0) {
       object = decodeString(reader, head - 0xa0, stateIsMapKey(reader), 0);
     } else {
@@ -674,9 +804,14 @@ function decodeValue(reader: Reader): unknown {
           if (size !== 0) {
             pushArrayState(reader, size);
             completeHead(reader);
-            continue DECODE;
+            const filled = fillScalarArray(reader);
+            if (filled === undefined) {
+              continue DECODE;
+            }
+            object = filled;
+          } else {
+            object = [];
           }
-          object = [];
           break;
         }
         case 0xdd: {
@@ -684,9 +819,14 @@ function decodeValue(reader: Reader): unknown {
           if (size !== 0) {
             pushArrayState(reader, size);
             completeHead(reader);
-            continue DECODE;
+            const filled = fillScalarArray(reader);
+            if (filled === undefined) {
+              continue DECODE;
+            }
+            object = filled;
+          } else {
+            object = [];
           }
-          object = [];
           break;
         }
         case 0xde: {

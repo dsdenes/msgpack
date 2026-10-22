@@ -7,6 +7,15 @@ arrays, maps, timestamps, application-registered extension types, and nested
 combinations of them. It is published as `@dsdenes/msgpack@1.0.0`; applications
 install it directly and import the same API names.
 
+## Runtime support
+
+The repository and the published package target Node.js 24 LTS (Krypton).
+`package.json` pins `engines.node` to `24.x`, `.nvmrc` holds `24`, and install,
+build, type checking, tests, the benchmark, and every verification script run
+with `npm` and `node`. The package itself declares no `engines` field and no
+runtime dependencies, so browser and other non-Node consumers stay unblocked,
+and the UMD bundle described below keeps browser support.
+
 ## Benchmark
 
 `@dsdenes/msgpack` is a drop-in replacement for msgpack-javascript 3.1.3: same
@@ -17,15 +26,16 @@ against the original on the same machine and payloads:
 
 | Operation | Median time (new ÷ original) | Median speedup | Best case | Worst case |
 |---|---:|---:|---:|---:|
-| Encode | 44% | 2.25× | 90% less time | 4% less time |
-| Decode | 73% | 1.37× | 41% less time | 0.3% less time |
+| Encode | 48% | 2.08× | 89% less time | 3.8% less time |
+| Decode | 38% | 2.65× | 84% less time | 2.3% less time |
 
 Every measured payload encodes and decodes faster; none is slower for either
-operation. A typical application response encodes about 2× and decodes about
-1.5× faster; long ASCII text encodes about 10× faster. Measured on Bun 1.4.2,
-Linux x64, one call at a time in alternating order, after warmup. The cases
-range from one-byte primitives through 256 KB binary values, 20,000-element
-arrays, 4,000-key maps, and 220 KB nested responses.
+operation. A typical application response encodes about 1.4× and decodes about
+1.35× faster; long ASCII text encodes about 3.6× faster. Measured on Node.js
+24.18.0, Linux x64 (AMD Ryzen 9 5950X), one call at a time in alternating
+order, after warmup. The cases range from one-byte primitives through 256 KB
+binary values, 20,000-element arrays, 4,000-key maps, and 220 KB nested
+responses.
 
 ## Install
 
@@ -268,3 +278,32 @@ values while map keys stay strings, and its values are limited by
 `maxBinLength`. The `max*Length` options reject input with `DecodeError` at the
 same boundary as the reference. `keyDecoder: null` disables the shared key
 cache.
+
+## Development
+
+Install and run everything from the repository root with Node.js 24 LTS on
+`PATH`:
+
+| Command | Purpose |
+| --- | --- |
+| `npm ci` | Install the workspace from `package-lock.json` |
+| `npm run build` | Write the ESM, CommonJS, declaration, and UMD files under `packages/msgpack/lib/` |
+| `npm run typecheck` | Type-check the workspace with `tsc` |
+| `npm test` | Build, then run the differential tests against msgpack-javascript 3.1.3 |
+| `npm run bench` | Build, then compare encode and decode timings for all 33 cases |
+| `npm run verify:options` | Public entry points: encoding and decoding options |
+| `npm run verify:multi` | Public entry points: consecutive-message decoding |
+| `npm run verify:stream` | Public entry points: stream-fed decoding |
+| `npm run verify:malformed` | Malformed and unusual input across every entry point |
+| `npm run verify:surface` | Exports, subpaths, declarations, and tarball contents |
+| `npm run verify:typed` | Adopting application with strict TypeScript types |
+| `npm run verify:classic-typed` | Adopting application with classic Node resolution |
+| `npm run verify:classic-bundler` | Adopting application bundled by Browserify |
+| `npm run verify:server` | Node server application before and after the swap |
+| `npm run verify:browser` | Browser application before and after the swap (needs `google-chrome`) |
+| `npm run verify:browser-script` | Plain-script page before and after the swap (needs `google-chrome`) |
+| `npm run verify:adoption` | All six adoption applications |
+
+The verification scripts keep generated applications, npm installations, and
+browser profiles under `.tmp/`, and npm's cache and logs under `.npm-cache/`
+and `.npm-logs/`.

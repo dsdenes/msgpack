@@ -25,10 +25,13 @@ import {
 } from "msgpack-javascript-original";
 
 class Marker {
-  constructor(
-    public readonly payload: Uint8Array,
-    public readonly tag?: string,
-  ) {}
+  readonly payload: Uint8Array;
+  readonly tag?: string;
+
+  constructor(payload: Uint8Array, tag?: string) {
+    this.payload = payload;
+    this.tag = tag;
+  }
 }
 
 interface Registerable {

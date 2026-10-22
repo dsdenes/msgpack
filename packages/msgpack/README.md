@@ -11,8 +11,10 @@ combinations of them.
 npm install @dsdenes/msgpack
 ```
 
-The package is ESM and CommonJS compatible, ships its own TypeScript
-declarations, and has no runtime dependencies.
+The package runs on Node.js 24 LTS (Krypton) and is ESM and CommonJS
+compatible, ships its own TypeScript declarations, and has no runtime
+dependencies. It also keeps browser support: the plain-script UMD bundle
+described below defines the same `MessagePack` global as msgpack-javascript.
 
 ## Usage
 

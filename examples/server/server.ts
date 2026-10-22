@@ -1,3 +1,5 @@
+import { createServer } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { Decoder, Encoder, ExtensionCodec, decode, decodeMultiStream, encode } from "@dsdenes/msgpack";
 import { fixtures, GeoPoint, installExtensionCodec } from "./fixtures.ts";
 
@@ -9,79 +11,108 @@ installExtensionCodec(extensionCodec);
 const decoder = new Decoder({ extensionCodec });
 const encoder = new Encoder({ extensionCodec });
 
-const server = Bun.serve({
-  port: Number(process.env.PORT ?? 0),
-  hostname: "127.0.0.1",
-  async fetch(request) {
-    const url = new URL(request.url);
-
-    if (url.pathname === "/health") {
-      return new Response("ok");
-    }
-
-    if (url.pathname === "/fixtures") {
-      return new Response(encode(fixtures, { extensionCodec }), {
-        headers: { "content-type": "application/msgpack" },
-      });
-    }
-
-    if (url.pathname === "/decode" && request.method === "POST") {
-      const body = new Uint8Array(await request.arrayBuffer());
-      try {
-        const value = decoder.decode(body);
-        return Response.json({ ok: true, kind: typeOf(value), value: describeValue(value) });
-      } catch (error) {
-        return Response.json({ ok: false, error: describeError(error) });
-      }
-    }
-
-    if (url.pathname === "/multi" && request.method === "POST") {
-      const body = new Uint8Array(await request.arrayBuffer());
-      const values: unknown[] = [];
-      try {
-        for (const value of decoder.decodeMulti(body)) {
-          values.push(describeValue(value));
-        }
-        return Response.json({ values });
-      } catch (error) {
-        return Response.json({ values, error: describeError(error) });
-      }
-    }
-
-    if (url.pathname === "/encode" && request.method === "POST") {
-      const payload = await request.json();
-      const bytes = encoder.encode(payload);
-      return new Response(bytes, {
-        headers: { "content-type": "application/msgpack" },
-      });
-    }
-
-    if (url.pathname === "/stream" && request.method === "POST") {
-      // The request body is a byte stream holding consecutive messages. The
-      // application consumes it incrementally, with boundaries inside messages.
-      const body = new Uint8Array(await request.arrayBuffer());
-      const values: unknown[] = [];
-      try {
-        for await (const value of decodeMultiStream(chunked(body, 3), { extensionCodec })) {
-          values.push(describeValue(value));
-        }
-        return Response.json({ values });
-      } catch (error) {
-        return Response.json({ values, error: describeError(error) });
-      }
-    }
-
-    if (url.pathname === "/roundtrip" && request.method === "POST") {
-      const body = new Uint8Array(await request.arrayBuffer());
-      const value = decode(body, { extensionCodec });
-      return new Response(encode(value, { extensionCodec }), {
-        headers: { "content-type": "application/msgpack" },
-      });
-    }
-
-    return new Response("not found", { status: 404 });
-  },
+const server = createServer((request, response) => {
+  handle(request, response).catch((error: unknown) => {
+    sendText(response, String(error), 500);
+  });
 });
+
+async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  const url = new URL(request.url ?? "/", "http://127.0.0.1");
+
+  if (url.pathname === "/health") {
+    sendText(response, "ok");
+    return;
+  }
+
+  if (url.pathname === "/fixtures") {
+    sendBytes(response, encode(fixtures, { extensionCodec }));
+    return;
+  }
+
+  if (url.pathname === "/decode" && request.method === "POST") {
+    const body = await readBody(request);
+    try {
+      const value = decoder.decode(body);
+      sendJson(response, { ok: true, kind: typeOf(value), value: describeValue(value) });
+    } catch (error) {
+      sendJson(response, { ok: false, error: describeError(error) });
+    }
+    return;
+  }
+
+  if (url.pathname === "/multi" && request.method === "POST") {
+    const body = await readBody(request);
+    const values: unknown[] = [];
+    try {
+      for (const value of decoder.decodeMulti(body)) {
+        values.push(describeValue(value));
+      }
+      sendJson(response, { values });
+    } catch (error) {
+      sendJson(response, { values, error: describeError(error) });
+    }
+    return;
+  }
+
+  if (url.pathname === "/encode" && request.method === "POST") {
+    const payload = JSON.parse(await readText(request));
+    sendBytes(response, encoder.encode(payload));
+    return;
+  }
+
+  if (url.pathname === "/stream" && request.method === "POST") {
+    // The request body is a byte stream holding consecutive messages. The
+    // application consumes it incrementally, with boundaries inside messages.
+    const body = await readBody(request);
+    const values: unknown[] = [];
+    try {
+      for await (const value of decodeMultiStream(chunked(body, 3), { extensionCodec })) {
+        values.push(describeValue(value));
+      }
+      sendJson(response, { values });
+    } catch (error) {
+      sendJson(response, { values, error: describeError(error) });
+    }
+    return;
+  }
+
+  if (url.pathname === "/roundtrip" && request.method === "POST") {
+    const body = await readBody(request);
+    const value = decode(body, { extensionCodec });
+    sendBytes(response, encode(value, { extensionCodec }));
+    return;
+  }
+
+  sendText(response, "not found", 404);
+}
+
+async function readBody(request: IncomingMessage): Promise<Uint8Array> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of request) {
+    chunks.push(chunk as Buffer);
+  }
+  return new Uint8Array(Buffer.concat(chunks));
+}
+
+async function readText(request: IncomingMessage): Promise<string> {
+  return new TextDecoder().decode(await readBody(request));
+}
+
+function sendText(response: ServerResponse, text: string, status = 200): void {
+  response.writeHead(status, { "content-type": "text/plain; charset=utf-8" });
+  response.end(text);
+}
+
+function sendJson(response: ServerResponse, value: unknown): void {
+  response.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+  response.end(JSON.stringify(value));
+}
+
+function sendBytes(response: ServerResponse, bytes: Uint8Array): void {
+  response.writeHead(200, { "content-type": "application/msgpack" });
+  response.end(bytes);
+}
 
 function describeError(error: unknown): { name: string; message: string } {
   const typed = error as Error;
@@ -130,4 +161,10 @@ function describeValue(value: unknown): unknown {
   return record;
 }
 
-console.log(`PORT=${server.port}`);
+server.listen(Number(process.env.PORT ?? 0), "127.0.0.1", () => {
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    throw new Error("server did not bind a TCP port");
+  }
+  console.log(`PORT=${address.port}`);
+});

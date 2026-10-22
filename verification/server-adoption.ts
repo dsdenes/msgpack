@@ -1,6 +1,8 @@
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cp, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
+import { installDependencies } from "./command.ts";
 import {
   decode as referenceDecode,
   decodeMulti as referenceDecodeMulti,
@@ -18,7 +20,7 @@ import {
 const referenceCodec = new ReferenceExtensionCodec();
 installExtensionCodec(referenceCodec);
 
-const root = dirname(import.meta.dir);
+const root = dirname(import.meta.dirname);
 const appDir = join(root, "examples/server");
 const packageDir = join(root, "packages/msgpack");
 const appName = appDir.slice(appDir.lastIndexOf("/") + 1);
@@ -55,10 +57,7 @@ async function makeApp(variant: "baseline" | "replacement"): Promise<string> {
     recursive: true,
     filter: (source) => {
       const rel = relative(appDir, source);
-      return (
-        rel === "" ||
-        (!rel.startsWith("node_modules") && !rel.startsWith("dist") && rel !== "bun.lock")
-      );
+      return rel === "" || (!rel.startsWith("node_modules") && !rel.startsWith("dist"));
     },
   });
 
@@ -85,14 +84,7 @@ async function makeApp(variant: "baseline" | "replacement"): Promise<string> {
   }
   await writeFile(join(dir, "package.json"), JSON.stringify(manifest, null, 2) + "\n");
 
-  const install = Bun.spawnSync(["bun", "install", "--silent"], {
-    cwd: dir,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  if (install.exitCode !== 0) {
-    throw new Error(`bun install failed for ${variant}: ${install.stderr.toString()}`);
-  }
+  installDependencies(dir, variant);
   return dir;
 }
 
@@ -142,37 +134,46 @@ function sameValue(actual: unknown, expected: unknown): boolean {
 }
 
 async function startServer(cwd: string): Promise<{ url: string; stop: () => void }> {
-  const process = Bun.spawn(["bun", "run", "server.ts"], {
+  const child = spawn(process.execPath, ["server.ts"], {
     cwd,
-    env: { ...Bun.env, PORT: "0" },
-    stdout: "pipe",
-    stderr: "pipe",
+    env: { ...process.env, PORT: "0" },
+    stdio: ["ignore", "pipe", "pipe"],
   });
 
-  const decoder = new TextDecoder();
-  let buffered = "";
-  const reader = process.stdout.getReader();
-  const timer = setTimeout(() => process.kill(), 15_000);
-  let port = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
+  const stderr: Buffer[] = [];
+  child.stderr.on("data", (chunk: Buffer) => {
+    stderr.push(chunk);
+  });
+  const timer = setTimeout(() => child.kill(), 15_000);
+  const port = await new Promise<number>((listening, failed) => {
+    let buffered = "";
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      buffered += chunk;
+      const match = buffered.match(/PORT=(\d+)/);
+      if (match) {
+        clearTimeout(timer);
+        listening(Number(match[1]));
+      }
+    });
+    child.on("error", (error) => {
       clearTimeout(timer);
-      throw new Error(`server exited before listening: ${await new Response(process.stderr).text()}`);
-    }
-    buffered += decoder.decode(value, { stream: true });
-    const match = buffered.match(/PORT=(\d+)/);
-    if (match) {
+      failed(error);
+    });
+    child.on("exit", (code) => {
       clearTimeout(timer);
-      port = Number(match[1]);
-      break;
-    }
-  }
+      failed(
+        new Error(
+          `server exited before listening (${code}): ${Buffer.concat(stderr).toString()}`,
+        ),
+      );
+    });
+  });
 
   return {
     url: `http://127.0.0.1:${port}`,
     stop: () => {
-      process.kill();
+      child.kill();
     },
   };
 }

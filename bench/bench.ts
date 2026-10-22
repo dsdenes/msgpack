@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { isDeepStrictEqual } from "node:util";
 import {
   decode as referenceDecode,
@@ -37,19 +38,27 @@ function median(values: number[]): number {
   return sorted[sorted.length >> 1];
 }
 
+/** Collects garbage when the process runs with --expose-gc. */
+function collectGarbage(): void {
+  const collector = globalThis.gc;
+  if (typeof collector === "function") {
+    collector();
+  }
+}
+
 function measure(fn: () => void, iterations: number): number {
-  const start = Bun.nanoseconds();
+  const start = process.hrtime.bigint();
   for (let i = 0; i < iterations; i++) {
     fn();
   }
-  return (Bun.nanoseconds() - start) / iterations;
+  return Number(process.hrtime.bigint() - start) / iterations;
 }
 
 /** Distinguishable call cost for one operation, timer overhead included. */
 function timeOne(fn: () => void): number {
-  const start = Bun.nanoseconds();
+  const start = process.hrtime.bigint();
   fn();
-  return Bun.nanoseconds() - start;
+  return Number(process.hrtime.bigint() - start);
 }
 
 function sample(item: Case, mode: "encode" | "decode"): Sample {
@@ -95,7 +104,7 @@ function sample(item: Case, mode: "encode" | "decode"): Sample {
     measure(runReference, warmup);
     measure(runReplacement, warmup);
   }
-  Bun.gc(true);
+  collectGarbage();
 
   // Time one call at a time, alternating libraries so both see the same CPU
   // state. The median of adjacent pairs does not depend on which library got
@@ -142,8 +151,8 @@ function row(result: Result): string {
   ].join("");
 }
 
-function decodeJson(stdout: Uint8Array): string {
-  const output = new TextDecoder().decode(stdout).trim().split("\n");
+function decodeJson(stdout: string): string {
+  const output = stdout.trim().split("\n");
   const line = output.filter((entry) => entry.startsWith("{")).at(-1);
   if (line === undefined) {
     throw new Error("benchmark child produced no result");
@@ -152,15 +161,13 @@ function decodeJson(stdout: Uint8Array): string {
 }
 
 function runChild(item: Case, mode: "encode" | "decode"): Sample {
-  const child = Bun.spawnSync({
-    cmd: [process.execPath, import.meta.path],
+  const child = spawnSync(process.execPath, ["--expose-gc", import.meta.filename], {
     env: { ...process.env, BENCH_CASE: item.name, BENCH_MODE: mode, BENCH_FILTER: "" },
-    stdout: "pipe",
-    stderr: "pipe",
+    encoding: "utf8",
   });
-  if (child.exitCode !== 0) {
-    const stderr = new TextDecoder().decode(child.stderr).trim();
-    const stdout = new TextDecoder().decode(child.stdout).trim();
+  if (child.status !== 0) {
+    const stderr = (child.stderr ?? "").trim();
+    const stdout = (child.stdout ?? "").trim();
     throw new Error(`${item.name} (${mode}) failed:\n${stderr || stdout}`);
   }
   return JSON.parse(decodeJson(child.stdout)) as Sample;
@@ -235,7 +242,7 @@ if (SINGLE_CASE) {
   }
   // One process per case and operation: no JIT state, heap shape, or CPU
   // history leaks between unrelated payloads.
-  Bun.gc(true);
+  collectGarbage();
   console.log(JSON.stringify(sample(item, mode)));
 } else {
   runAll();

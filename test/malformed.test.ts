@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import assert from "node:assert/strict";
+import { describe, test } from "node:test";
 import {
   decode as referenceDecode,
   decodeMulti as referenceDecodeMulti,
@@ -10,7 +11,7 @@ import {
   decode,
   decodeMulti,
   decodeMultiStream,
-} from "../packages/msgpack/src/index.ts";
+} from "@dsdenes/msgpack";
 
 function hex(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("hex");
@@ -68,10 +69,11 @@ function iterable(chunks: Uint8Array[]): AsyncIterable<Uint8Array> {
 describe("differences that malformed input exposes", () => {
   test("extra bytes report the reference's RangeError description", () => {
     const bytes = Uint8Array.from([0x01, 0x02, 0x03]);
-    expect(outcome(() => decode(bytes))).toBe(
+    assert.strictEqual(
+      outcome(() => decode(bytes)),
       "error:RangeError:RangeError:Extra 2 of 3 byte(s) found at buffer[1]",
     );
-    expect(outcome(() => referenceDecode(bytes))).toBe(outcome(() => decode(bytes)));
+    assert.strictEqual(outcome(() => referenceDecode(bytes)), outcome(() => decode(bytes)));
   });
 
   test("the reserved type byte fails with DecodeError", () => {
@@ -82,10 +84,10 @@ describe("differences that malformed input exposes", () => {
     } catch (caught) {
       error = caught;
     }
-    expect(error).toBeInstanceOf(DecodeError);
-    expect((error as Error).name).toBe("DecodeError");
-    expect((error as Error).message).toBe("Unrecognized type byte: 0xc1");
-    expect(outcome(() => decode(bytes))).toBe(outcome(() => referenceDecode(bytes)));
+    assert.ok(error instanceof DecodeError);
+    assert.strictEqual((error as Error).name, "DecodeError");
+    assert.strictEqual((error as Error).message, "Unrecognized type byte: 0xc1");
+    assert.strictEqual(outcome(() => decode(bytes)), outcome(() => referenceDecode(bytes)));
   });
 
   test("a __proto__ map key fails with DecodeError", () => {
@@ -98,9 +100,9 @@ describe("differences that malformed input exposes", () => {
     } catch (caught) {
       error = caught;
     }
-    expect(error).toBeInstanceOf(DecodeError);
-    expect((error as Error).message).toBe("The key __proto__ is not allowed");
-    expect(outcome(() => decode(bytes))).toBe(outcome(() => referenceDecode(bytes)));
+    assert.ok(error instanceof DecodeError);
+    assert.strictEqual((error as Error).message, "The key __proto__ is not allowed");
+    assert.strictEqual(outcome(() => decode(bytes)), outcome(() => referenceDecode(bytes)));
   });
 
   test("a timestamp extension of the wrong size fails with DecodeError", () => {
@@ -109,8 +111,8 @@ describe("differences that malformed input exposes", () => {
       Uint8Array.from([0xd5, 0xff, 0x00, 0x01]),
       Uint8Array.from([0xd8, 0xff, ...new Array(16).fill(0)]),
     ]) {
-      expect(outcome(() => decode(bytes))).toBe(outcome(() => referenceDecode(bytes)));
-      expect(outcome(() => decode(bytes))).toContain("error:DecodeError:DecodeError:");
+      assert.strictEqual(outcome(() => decode(bytes)), outcome(() => referenceDecode(bytes)));
+      assert.ok(outcome(() => decode(bytes)).includes("error:DecodeError:DecodeError:"));
     }
   });
 
@@ -122,14 +124,20 @@ describe("differences that malformed input exposes", () => {
         Uint8Array.from([header, 0x00, 0x00]),
         Uint8Array.from([header, 0xff, 0xff, 0xff, 0xff]),
       ]) {
-        expect({ hex: hex(bytes), decode: outcome(() => decode(bytes)) }).toEqual({
-          hex: hex(bytes),
-          decode: outcome(() => referenceDecode(bytes)),
-        });
-        expect({ hex: hex(bytes), multi: outcome(() => [...decodeMulti(bytes)]) }).toEqual({
-          hex: hex(bytes),
-          multi: outcome(() => [...referenceDecodeMulti(bytes)]),
-        });
+        assert.deepStrictEqual(
+          { hex: hex(bytes), decode: outcome(() => decode(bytes)) },
+          {
+            hex: hex(bytes),
+            decode: outcome(() => referenceDecode(bytes)),
+          },
+        );
+        assert.deepStrictEqual(
+          { hex: hex(bytes), multi: outcome(() => [...decodeMulti(bytes)]) },
+          {
+            hex: hex(bytes),
+            multi: outcome(() => [...referenceDecodeMulti(bytes)]),
+          },
+        );
       }
     }
   });
@@ -144,15 +152,18 @@ describe("differences that malformed input exposes", () => {
     for (const payload of payloads) {
       for (let length = 0; length <= payload.length; length++) {
         const bytes = payload.slice(0, length);
-        expect({
-          hex: hex(bytes),
-          decode: outcome(() => decode(bytes)),
-          multi: outcome(() => [...decodeMulti(bytes)]),
-        }).toEqual({
-          hex: hex(bytes),
-          decode: outcome(() => referenceDecode(bytes)),
-          multi: outcome(() => [...referenceDecodeMulti(bytes)]),
-        });
+        assert.deepStrictEqual(
+          {
+            hex: hex(bytes),
+            decode: outcome(() => decode(bytes)),
+            multi: outcome(() => [...decodeMulti(bytes)]),
+          },
+          {
+            hex: hex(bytes),
+            decode: outcome(() => referenceDecode(bytes)),
+            multi: outcome(() => [...referenceDecodeMulti(bytes)]),
+          },
+        );
       }
     }
   });
@@ -170,9 +181,9 @@ describe("unusual but valid input", () => {
       value = value[0];
       actualDepth++;
     }
-    expect(actualDepth).toBe(depth);
-    expect(value).toBe(1);
-    expect(outcome(() => referenceDecode(bytes))).toBe(outcome(() => decode(bytes)));
+    assert.strictEqual(actualDepth, depth);
+    assert.strictEqual(value, 1);
+    assert.strictEqual(outcome(() => referenceDecode(bytes)), outcome(() => decode(bytes)));
   });
 
   test("deeply nested maps decode without exhausting the call stack", () => {
@@ -194,8 +205,8 @@ describe("unusual but valid input", () => {
       value = next as Record<string, unknown>;
       actualDepth++;
     }
-    expect(actualDepth).toBe(depth - 1);
-    expect(value).toEqual({ a: 1 });
+    assert.strictEqual(actualDepth, depth - 1);
+    assert.deepStrictEqual(value, { a: 1 });
   });
 
   test("invalid UTF-8 at a string tail matches the reference for every chunk split", async () => {
@@ -208,7 +219,7 @@ describe("unusual but valid input", () => {
       const chunks = chunksOf(bytes, [cut]);
       const expected = await streamValues(iterable(chunks), referenceDecodeMultiStream);
       const actual = await streamValues(iterable(chunks), decodeMultiStream);
-      expect(actual).toEqual(expected);
+      assert.deepStrictEqual(actual, expected);
     }
   });
 
@@ -219,7 +230,8 @@ describe("unusual but valid input", () => {
       const bytes = Uint8Array.from([...first, ...second.slice(0, length)]);
       for (let cut = 0; cut <= bytes.length; cut++) {
         const chunks = chunksOf(bytes, [cut]);
-        expect(await streamValues(iterable(chunks), decodeMultiStream)).toEqual(
+        assert.deepStrictEqual(
+          await streamValues(iterable(chunks), decodeMultiStream),
           await streamValues(iterable(chunks), referenceDecodeMultiStream),
         );
       }

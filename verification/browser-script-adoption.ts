@@ -1,5 +1,7 @@
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { dirname, join } from "node:path";
 import {
   encode as referenceEncode,
@@ -14,10 +16,13 @@ import {
  */
 
 class GeoPoint {
-  constructor(
-    public lat: number,
-    public lon: number,
-  ) {}
+  lat: number;
+  lon: number;
+
+  constructor(lat: number, lon: number) {
+    this.lat = lat;
+    this.lon = lon;
+  }
 }
 
 const referenceCodec = new ReferenceExtensionCodec();
@@ -39,7 +44,7 @@ referenceCodec.register({
   },
 });
 
-const root = dirname(import.meta.dir);
+const root = dirname(import.meta.dirname);
 const pageFile = join(root, "examples/browser-script/page.html");
 const originalBundle = join(
   root,
@@ -126,72 +131,92 @@ async function sha256File(path: string): Promise<string> {
   return createHash("sha256").update(await readFile(path)).digest("hex");
 }
 
-function serve(
+async function serve(
   pages: Record<string, string>,
   requested: string[],
-): { url: string; stop: () => void } {
+): Promise<{ url: string; stop: () => void }> {
   const scripts: Record<string, string> = {
     [BASELINE_SCRIPT]: originalBundle,
     [REPLACEMENT_SCRIPT]: replacementBundle,
   };
-  const server = Bun.serve({
-    port: 0,
-    hostname: "127.0.0.1",
-    fetch(request) {
-      const pathname = new URL(request.url).pathname;
-      requested.push(pathname);
-      if (pathname in pages) {
-        return new Response(pages[pathname], {
-          headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+  const server = createServer(async (request, response) => {
+    const pathname = new URL(request.url ?? "/", "http://127.0.0.1").pathname;
+    requested.push(pathname);
+    if (pathname in pages) {
+      response.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+      });
+      response.end(pages[pathname]);
+      return;
+    }
+    if (pathname in scripts) {
+      try {
+        const body = await readFile(scripts[pathname]);
+        response.writeHead(200, {
+          "content-type": "text/javascript; charset=utf-8",
+          "cache-control": "no-store",
         });
+        response.end(body);
+      } catch {
+        response.writeHead(404);
+        response.end("not found");
       }
-      if (pathname in scripts) {
-        return new Response(Bun.file(scripts[pathname]), {
-          headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" },
-        });
-      }
-      return new Response("not found", { status: 404 });
-    },
+      return;
+    }
+    response.writeHead(404);
+    response.end("not found");
   });
+  await new Promise<void>((listening) => {
+    server.listen(0, "127.0.0.1", listening);
+  });
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    throw new Error("plain-script verification server has no port");
+  }
   return {
-    url: `http://127.0.0.1:${server.port}`,
-    stop: () => server.stop(true),
+    url: `http://127.0.0.1:${address.port}`,
+    stop: () => server.close(),
   };
+}
+
+async function runChrome(args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      CHROME,
+      args,
+      {
+        cwd: root,
+        encoding: "utf8",
+        env: { ...process.env, TMPDIR: ".tmp/tmp" },
+        timeout: 30_000,
+        maxBuffer: 32 * 1024 * 1024,
+      },
+      (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(`chrome failed: ${String(stderr) || error.message}`));
+          return;
+        }
+        resolve(String(stdout));
+      },
+    );
+  });
 }
 
 async function loadInBrowser(url: string): Promise<PageResult> {
   // Relative paths keep Chrome's Unix socket below the kernel's length limit.
   await mkdir(join(root, ".tmp", "chrome"), { recursive: true });
   await mkdir(join(root, ".tmp", "tmp"), { recursive: true });
-  const chrome = Bun.spawn(
-    [
-      CHROME,
-      "--headless=new",
-      "--no-sandbox",
-      "--disable-gpu",
-      "--disable-dev-shm-usage",
-      "--user-data-dir=.tmp/chrome",
-      "--virtual-time-budget=5000",
-      "--dump-dom",
-      url,
-    ],
-    {
-      cwd: root,
-      stdout: "pipe",
-      stderr: "pipe",
-      env: { ...Bun.env, TMPDIR: ".tmp/tmp" },
-    },
-  );
-  const timer = setTimeout(() => chrome.kill(), 30_000);
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(chrome.stdout).text(),
-    new Response(chrome.stderr).text(),
-    chrome.exited,
+  const stdout = await runChrome([
+    "--headless=new",
+    "--no-sandbox",
+    "--disable-gpu",
+    "--disable-dev-shm-usage",
+    "--user-data-dir=.tmp/chrome",
+    "--virtual-time-budget=5000",
+    "--dump-dom",
+    url,
   ]);
-  clearTimeout(timer);
-  if (exitCode !== 0) {
-    throw new Error(`chrome failed: ${stderr}`);
-  }
   const match = stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/);
   if (!match) {
     throw new Error(`no result element in DOM: ${stdout.slice(0, 500)}`);
@@ -242,7 +267,7 @@ const bundleIsPlainScript =
   /root\.MessagePack\s*=\s*factory\(\)/.test(bundle);
 
 const requested: string[] = [];
-const server = serve(
+const server = await serve(
   {
     "/baseline.html": baselineHtml,
     "/replacement.html": replacementHtml,

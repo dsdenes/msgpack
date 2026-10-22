@@ -1,8 +1,11 @@
 export class BenchPoint {
-  constructor(
-    public lat: number,
-    public lon: number,
-  ) {}
+  lat: number;
+  lon: number;
+
+  constructor(lat: number, lon: number) {
+    this.lat = lat;
+    this.lon = lon;
+  }
 }
 
 export interface Registerable {

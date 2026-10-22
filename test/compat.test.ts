@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import assert from "node:assert/strict";
+import { describe, test } from "node:test";
 import {
   decode as referenceDecode,
   decodeMulti as referenceDecodeMulti,
@@ -14,7 +15,7 @@ import {
   Encoder,
   ExtData,
   ExtensionCodec,
-} from "../packages/msgpack/src/index.ts";
+} from "@dsdenes/msgpack";
 import { allPayloads, binaryPayloads } from "./payloads.ts";
 import { customPayloads, extensionPayloads, installExtensionCodec, timestampPayloads } from "./extensions.ts";
 
@@ -110,7 +111,7 @@ describe("encoding identity with msgpack-javascript", () => {
     test(payload.name, () => {
       const expected = referenceEncode(payload.value);
       const actual = encode(payload.value);
-      expect(hex(actual)).toBe(hex(expected));
+      assert.strictEqual(hex(actual), hex(expected));
     });
   }
 
@@ -118,7 +119,7 @@ describe("encoding identity with msgpack-javascript", () => {
     test(payload.name, () => {
       const expected = referenceEncode(payload.value);
       const actual = encode(payload.value);
-      expect(hex(actual)).toBe(hex(expected));
+      assert.strictEqual(hex(actual), hex(expected));
     });
   }
 });
@@ -142,8 +143,8 @@ describe("decoding identity with msgpack-javascript", () => {
       const expected = referenceDecode(bytes);
       const actual = decode(bytes);
       if (Buffer.isBuffer(expected)) {
-        expect(actual).toBeInstanceOf(Uint8Array);
-        expect(hex(actual as Uint8Array)).toBe(hex(expected));
+        assert.ok(actual instanceof Uint8Array);
+        assert.strictEqual(hex(actual as Uint8Array), hex(expected));
         return;
       }
       assertSameValue(actual, expected);
@@ -154,7 +155,7 @@ describe("decoding identity with msgpack-javascript", () => {
 describe("default timestamp extension", () => {
   for (const payload of timestampPayloads) {
     test(`${payload.name} encoding`, () => {
-      expect(hex(encode(payload.value))).toBe(hex(referenceEncode(payload.value)));
+      assert.strictEqual(hex(encode(payload.value)), hex(referenceEncode(payload.value)));
     });
 
     test(`${payload.name} decoding`, () => {
@@ -174,7 +175,7 @@ describe("registered extension encoding identity", () => {
     test(payload.name, () => {
       const expected = referenceEncode(payload.value, { extensionCodec: referenceCodec });
       const actual = encode(payload.value, { extensionCodec: replacementCodec });
-      expect(hex(actual)).toBe(hex(expected));
+      assert.strictEqual(hex(actual), hex(expected));
     });
   }
 });
@@ -198,14 +199,17 @@ describe("unregistered extension values", () => {
     const bytes = new Uint8Array([0xd4, 0x05, 0x2a]);
     const expected = referenceDecode(bytes) as ReferenceExtData;
     const actual = decode(bytes) as ExtData;
-    expect(actual).toBeInstanceOf(ExtData);
-    expect(actual.type).toBe(expected.type);
-    expect(hex(actual.data as Uint8Array)).toBe(hex(expected.data as Uint8Array));
+    assert.ok(actual instanceof ExtData);
+    assert.strictEqual(actual.type, expected.type);
+    assert.strictEqual(hex(actual.data as Uint8Array), hex(expected.data as Uint8Array));
   });
 
   test("ExtData re-encodes with the same bytes", () => {
     const data = new Uint8Array([1, 2, 3]);
-    expect(hex(encode(new ExtData(9, data)))).toBe(hex(referenceEncode(new ReferenceExtData(9, data))));
+    assert.strictEqual(
+      hex(encode(new ExtData(9, data))),
+      hex(referenceEncode(new ReferenceExtData(9, data))),
+    );
   });
 });
 
@@ -220,7 +224,7 @@ describe("class API with extensions", () => {
     const encoder = new Encoder({ extensionCodec: replacementCodec });
     const decoder = new Decoder({ extensionCodec: replacementCodec });
     const bytes = encoder.encode(value);
-    expect(hex(bytes)).toBe(hex(referenceEncode(value, { extensionCodec: referenceCodec })));
+    assert.strictEqual(hex(bytes), hex(referenceEncode(value, { extensionCodec: referenceCodec })));
     assertSameValue(decoder.decode(bytes), referenceDecode(bytes, { extensionCodec: referenceCodec }));
   });
 });
@@ -236,17 +240,17 @@ describe("class API and input forms", () => {
     const first = encode({ first: 1 });
     const before = hex(first);
     encode({ second: 2 });
-    expect(hex(first)).toBe(before);
+    assert.strictEqual(hex(first), before);
   });
 
   test("Encoder.encode matches module encode", () => {
     const encoder = new Encoder();
-    expect(hex(encoder.encode(value))).toBe(hex(referenceEncode(value)));
+    assert.strictEqual(hex(encoder.encode(value)), hex(referenceEncode(value)));
   });
 
   test("Encoder.encodeSharedRef matches module encode", () => {
     const encoder = new Encoder();
-    expect(hex(encoder.encodeSharedRef(value))).toBe(hex(referenceEncode(value)));
+    assert.strictEqual(hex(encoder.encodeSharedRef(value)), hex(referenceEncode(value)));
   });
 
   test("Decoder.decode matches module decode", () => {
@@ -271,7 +275,7 @@ describe("class API and input forms", () => {
     const bytes = referenceEncode(value);
     const withExtra = new Uint8Array(bytes.length + 1);
     withExtra.set(bytes);
-    expect(() => decode(withExtra)).toThrow(RangeError);
+    assert.throws(() => decode(withExtra), RangeError);
   });
 
   test("number map keys decode as object properties", () => {
@@ -326,9 +330,9 @@ describe("multi-message decoding", () => {
   test("delivers every consecutive message in order", () => {
     const expected = collectMulti(() => referenceDecodeMulti(bytes, referenceOptions));
     const actual = collectMulti(() => decodeMulti(bytes, replacementOptions));
-    expect(expected.error).toBeNull();
-    expect(actual.error).toBeNull();
-    expect(actual.values.length).toBe(values.length);
+    assert.strictEqual(expected.error, null);
+    assert.strictEqual(actual.error, null);
+    assert.strictEqual(actual.values.length, values.length);
     for (let i = 0; i < expected.values.length; i++) {
       assertSameValue(actual.values[i], expected.values[i], `$[${i}]`);
     }
@@ -337,9 +341,9 @@ describe("multi-message decoding", () => {
   test("Decoder.decodeMulti matches the module function", () => {
     const expected = collectMulti(() => new Decoder(replacementOptions).decodeMulti(bytes));
     const actual = collectMulti(() => decodeMulti(bytes, replacementOptions));
-    expect(expected.error).toBeNull();
-    expect(actual.error).toBeNull();
-    expect(actual.values.length).toBe(expected.values.length);
+    assert.strictEqual(expected.error, null);
+    assert.strictEqual(actual.error, null);
+    assert.strictEqual(actual.values.length, expected.values.length);
     for (let i = 0; i < expected.values.length; i++) {
       assertSameValue(actual.values[i], expected.values[i], `$[${i}]`);
     }
@@ -347,8 +351,11 @@ describe("multi-message decoding", () => {
 
   test("empty buffer yields zero messages", () => {
     const empty = new Uint8Array(0);
-    expect(collectMulti(() => decodeMulti(empty))).toEqual({ values: [], error: null });
-    expect(collectMulti(() => new Decoder().decodeMulti(empty))).toEqual({ values: [], error: null });
+    assert.deepStrictEqual(collectMulti(() => decodeMulti(empty)), { values: [], error: null });
+    assert.deepStrictEqual(collectMulti(() => new Decoder().decodeMulti(empty)), {
+      values: [],
+      error: null,
+    });
   });
 
   test("truncated final message delivers complete messages then fails like the reference", () => {
@@ -368,10 +375,10 @@ describe("multi-message decoding", () => {
       const actual = collectMulti(() => decodeMulti(truncated, replacementOptions));
       const classActual = collectMulti(() => new Decoder(replacementOptions).decodeMulti(truncated));
 
-      expect(actual.values.length).toBe(2);
-      expect(actual.error?.constructor).toBe("RangeError");
-      expect(actual).toEqual(expected);
-      expect(classActual).toEqual(expected);
+      assert.strictEqual(actual.values.length, 2);
+      assert.strictEqual(actual.error?.constructor, "RangeError");
+      assert.deepStrictEqual(actual, expected);
+      assert.deepStrictEqual(classActual, expected);
       assertSameValue(actual.values[0], null);
       assertSameValue(actual.values[1], "prefix");
     }
@@ -379,9 +386,9 @@ describe("multi-message decoding", () => {
 
   test("single-message decode still rejects a buffer with multiple messages", () => {
     const two = concatBytes([referenceEncode("first"), referenceEncode("second")]);
-    expect(() => decode(two)).toThrow(RangeError);
-    expect(() => new Decoder().decode(two)).toThrow(RangeError);
-    expect(collectMulti(() => decodeMulti(two))).toEqual({
+    assert.throws(() => decode(two), RangeError);
+    assert.throws(() => new Decoder().decode(two), RangeError);
+    assert.deepStrictEqual(collectMulti(() => decodeMulti(two)), {
       values: ["first", "second"],
       error: null,
     });

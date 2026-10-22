@@ -60,7 +60,11 @@ function concat(parts: Uint8Array[]): Uint8Array {
 // --- application extension used by the fixtures ---------------------------
 
 class Marker {
-  constructor(public readonly payload: string) {}
+  readonly payload: string;
+
+  constructor(payload: string) {
+    this.payload = payload;
+  }
 }
 
 const referenceCodec = new ReferenceExtensionCodec();

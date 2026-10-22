@@ -1,30 +1,29 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { build } from "esbuild";
 
-const root = dirname(import.meta.dir);
+const root = dirname(import.meta.dirname);
 const outDir = join(root, "packages/msgpack/lib");
+const entryPoint = join(root, "packages/msgpack/src/index.ts");
 await mkdir(outDir, { recursive: true });
 
 const targets = [
-  { format: "esm", outfile: "packages/msgpack/lib/index.mjs" },
-  { format: "cjs", outfile: "packages/msgpack/lib/index.cjs" },
+  { format: "esm", outfile: "index.mjs" },
+  { format: "cjs", outfile: "index.cjs" },
 ] as const;
 
 for (const target of targets) {
-  const result = await Bun.build({
-    entrypoints: [join(root, "packages/msgpack/src/index.ts")],
-    outdir: outDir,
-    naming: target.outfile.slice("packages/msgpack/lib/".length),
+  await build({
+    entryPoints: [entryPoint],
+    outfile: join(outDir, target.outfile),
+    bundle: true,
     format: target.format,
-    target: "browser",
+    platform: "browser",
+    target: "es2022",
     minify: false,
+    keepNames: true,
+    logLevel: "warning",
   });
-  if (!result.success) {
-    for (const log of result.logs) {
-      console.error(log);
-    }
-    process.exit(1);
-  }
 }
 
 // A browser page that loads msgpack-javascript with one plain script reference

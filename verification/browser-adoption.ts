@@ -1,7 +1,10 @@
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { dirname, join, relative } from "node:path";
+import { createServer } from "node:http";
+import { dirname, extname, join, relative } from "node:path";
 import { encode as referenceEncode, ExtensionCodec as ReferenceExtensionCodec } from "msgpack-javascript-original";
+import { installDependencies, runCommand } from "./command.ts";
 import {
   fixtures,
   GeoPoint,
@@ -12,7 +15,7 @@ import {
 const referenceCodec = new ReferenceExtensionCodec();
 installExtensionCodec(referenceCodec);
 
-const root = dirname(import.meta.dir);
+const root = dirname(import.meta.dirname);
 const appDir = join(root, "examples/browser");
 const packageDir = join(root, "packages/msgpack");
 const appName = appDir.slice(appDir.lastIndexOf("/") + 1);
@@ -44,10 +47,7 @@ async function makeApp(variant: "baseline" | "replacement"): Promise<string> {
     recursive: true,
     filter: (source) => {
       const rel = relative(appDir, source);
-      return (
-        rel === "" ||
-        (!rel.startsWith("node_modules") && !rel.startsWith("dist") && rel !== "bun.lock")
-      );
+      return rel === "" || (!rel.startsWith("node_modules") && !rel.startsWith("dist"));
     },
   });
 
@@ -74,84 +74,108 @@ async function makeApp(variant: "baseline" | "replacement"): Promise<string> {
   }
   await writeFile(join(dir, "package.json"), JSON.stringify(manifest, null, 2) + "\n");
 
-  const install = Bun.spawnSync(["bun", "install", "--silent"], {
-    cwd: dir,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  if (install.exitCode !== 0) {
-    throw new Error(`bun install failed for ${variant}: ${install.stderr.toString()}`);
-  }
+  installDependencies(dir, variant);
   return dir;
 }
 
 async function build(dir: string): Promise<void> {
   await rm(join(dir, "dist"), { recursive: true, force: true });
-  const result = Bun.spawnSync(["bunx", "vite", "build", "--outDir", "dist", "--emptyOutDir"], {
-    cwd: dir,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
+  const result = runCommand(
+    [
+      process.execPath,
+      join(dir, "node_modules", "vite", "bin", "vite.js"),
+      "build",
+      "--outDir",
+      "dist",
+      "--emptyOutDir",
+      // Comparing error names requires both bundles to preserve class names;
+      // minification renames them differently in each dependency's bundle.
+      "--minify",
+      "false",
+    ],
+    dir,
+  );
   if (result.exitCode !== 0) {
-    throw new Error(`vite build failed: ${result.stderr.toString()}${result.stdout.toString()}`);
+    throw new Error(`vite build failed: ${result.output}`);
   }
 }
 
-function serve(directory: string): { url: string; stop: () => void } {
-  const base = directory;
-  const server = Bun.serve({
-    port: 0,
-    hostname: "127.0.0.1",
-    fetch(request) {
-      const pathname = new URL(request.url).pathname;
-      const relative = pathname === "/" ? "index.html" : pathname.slice(1);
-      const file = Bun.file(join(base, relative));
-      if (!file.size) {
-        return new Response("not found", { status: 404 });
-      }
-      return new Response(file);
-    },
+const CONTENT_TYPES: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".map": "application/json; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".ico": "image/x-icon",
+};
+
+async function serve(directory: string): Promise<{ url: string; stop: () => void }> {
+  const server = createServer(async (request, response) => {
+    const pathname = new URL(request.url ?? "/", "http://127.0.0.1").pathname;
+    const relative = pathname === "/" ? "index.html" : pathname.slice(1);
+    try {
+      const body = await readFile(join(directory, relative));
+      response.writeHead(200, {
+        "content-type": CONTENT_TYPES[extname(relative)] ?? "application/octet-stream",
+      });
+      response.end(body);
+    } catch {
+      response.writeHead(404);
+      response.end("not found");
+    }
   });
+  await new Promise<void>((listening) => {
+    server.listen(0, "127.0.0.1", listening);
+  });
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    throw new Error("browser verification server has no port");
+  }
   return {
-    url: `http://127.0.0.1:${server.port}/`,
-    stop: () => server.stop(true),
+    url: `http://127.0.0.1:${address.port}/`,
+    stop: () => server.close(),
   };
+}
+
+async function runChrome(args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      CHROME,
+      args,
+      {
+        cwd: root,
+        encoding: "utf8",
+        env: { ...process.env, TMPDIR: ".tmp/tmp" },
+        timeout: 30_000,
+        maxBuffer: 32 * 1024 * 1024,
+      },
+      (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(`chrome failed: ${String(stderr) || error.message}`));
+          return;
+        }
+        resolve(String(stdout));
+      },
+    );
+  });
 }
 
 async function loadInBrowser(url: string): Promise<unknown> {
   // Relative paths keep Chrome's Unix socket below the kernel's length limit.
   await mkdir(join(root, ".tmp", "chrome"), { recursive: true });
   await mkdir(join(root, ".tmp", "tmp"), { recursive: true });
-  const chrome = Bun.spawn(
-    [
-      CHROME,
-      "--headless=new",
-      "--no-sandbox",
-      "--disable-gpu",
-      "--disable-dev-shm-usage",
-      "--user-data-dir=.tmp/chrome",
-      "--virtual-time-budget=5000",
-      "--dump-dom",
-      url,
-    ],
-    {
-      cwd: root,
-      stdout: "pipe",
-      stderr: "pipe",
-      env: { ...Bun.env, TMPDIR: ".tmp/tmp" },
-    },
-  );
-  const timer = setTimeout(() => chrome.kill(), 30_000);
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(chrome.stdout).text(),
-    new Response(chrome.stderr).text(),
-    chrome.exited,
+  const dom = await runChrome([
+    "--headless=new",
+    "--no-sandbox",
+    "--disable-gpu",
+    "--disable-dev-shm-usage",
+    "--user-data-dir=.tmp/chrome",
+    "--virtual-time-budget=5000",
+    "--dump-dom",
+    url,
   ]);
-  clearTimeout(timer);
-  if (exitCode !== 0) {
-    throw new Error(`chrome failed: ${stderr}`);
-  }
-  const dom = stdout;
   const match = dom.match(/<pre id="result">([\s\S]*?)<\/pre>/);
   if (!match) {
     throw new Error(`no result element in DOM: ${dom.slice(0, 500)}`);
@@ -209,7 +233,7 @@ interface BrowserResult {
 async function run(variant: "baseline" | "replacement"): Promise<BrowserResult> {
   const dir = await makeApp(variant);
   await build(dir);
-  const server = serve(join(dir, "dist"));
+  const server = await serve(join(dir, "dist"));
   try {
     return (await loadInBrowser(server.url)) as BrowserResult;
   } finally {

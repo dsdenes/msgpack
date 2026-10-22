@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import assert from "node:assert/strict";
+import { describe, test } from "node:test";
 import {
   decodeArrayStream as referenceDecodeArrayStream,
   decodeAsync as referenceDecodeAsync,
@@ -13,7 +14,8 @@ import {
   decodeMultiStream,
   Decoder,
   ExtensionCodec,
-} from "../packages/msgpack/src/index.ts";
+  type DecoderOptions,
+} from "@dsdenes/msgpack";
 import { allPayloads, binaryPayloads } from "./payloads.ts";
 import { extensionPayloads, installExtensionCodec } from "./extensions.ts";
 
@@ -98,6 +100,17 @@ async function asyncOutcome(run: () => Promise<unknown>): Promise<unknown> {
   }
 }
 
+function outcomeErrorName(value: unknown): string | undefined {
+  if (typeof value !== "object" || value === null || !("error" in value)) {
+    return undefined;
+  }
+  const error = value.error;
+  if (typeof error !== "object" || error === null || !("name" in error)) {
+    return undefined;
+  }
+  return typeof error.name === "string" ? error.name : undefined;
+}
+
 function concat(parts: Uint8Array[]): Uint8Array {
   let length = 0;
   for (const part of parts) {
@@ -163,9 +176,9 @@ describe("decodeMultiStream", () => {
   test("decodes every message in order for a single chunk", async () => {
     const expected = await multiOutcome(chunks(stream), referenceOptions, true);
     const actual = await multiOutcome(chunks(stream), replacementOptions, false);
-    expect(expected.error).toBeNull();
-    expect(actual).toEqual(expected);
-    expect(actual.values.length).toBe(streamValues.length);
+    assert.strictEqual(expected.error, null);
+    assert.deepStrictEqual(actual, expected);
+    assert.strictEqual(actual.values.length, streamValues.length);
   });
 
   test("decodes messages identically at every chunk boundary", async () => {
@@ -173,7 +186,7 @@ describe("decodeMultiStream", () => {
       const parts = [compactStream.subarray(0, split), compactStream.subarray(split)];
       const expected = await multiOutcome(chunks(...parts), referenceOptions, true);
       const actual = await multiOutcome(chunks(...parts), replacementOptions, false);
-      expect(actual, `split at ${split}`).toEqual(expected);
+      assert.deepStrictEqual(actual, expected, `split at ${split}`);
     }
   });
 
@@ -185,8 +198,8 @@ describe("decodeMultiStream", () => {
         const parts = [stream.subarray(0, split), stream.subarray(split)];
         const expected = await multiOutcome(chunks(...parts), referenceOptions, true);
         const actual = await multiOutcome(chunks(...parts), replacementOptions, false);
-        expect(actual, `split at ${split}`).toEqual(expected);
-        expect(actual.error).toBeNull();
+        assert.deepStrictEqual(actual, expected, `split at ${split}`);
+        assert.strictEqual(actual.error, null);
       }
     }
   });
@@ -195,28 +208,28 @@ describe("decodeMultiStream", () => {
     for (const size of [257, 1024, 4096]) {
       const expected = await multiOutcome(chunks(...byteChunks(stream, size)), referenceOptions, true);
       const actual = await multiOutcome(chunks(...byteChunks(stream, size)), replacementOptions, false);
-      expect(actual, `chunks of ${size}`).toEqual(expected);
-      expect(actual.error).toBeNull();
+      assert.deepStrictEqual(actual, expected, `chunks of ${size}`);
+      assert.strictEqual(actual.error, null);
     }
     for (const size of [1, 2, 3, 5, 7]) {
       const expected = await multiOutcome(chunks(...byteChunks(compactStream, size)), referenceOptions, true);
       const actual = await multiOutcome(chunks(...byteChunks(compactStream, size)), replacementOptions, false);
-      expect(actual, `compact chunks of ${size}`).toEqual(expected);
+      assert.deepStrictEqual(actual, expected, `compact chunks of ${size}`);
     }
   });
 
   test("one chunk of each message matches the same bytes in one buffer", async () => {
     const expected = await multiOutcome(chunks(stream), referenceOptions, true);
     const actual = await multiOutcome(chunks(...messages), replacementOptions, false);
-    expect(actual).toEqual(expected);
+    assert.deepStrictEqual(actual, expected);
   });
 
   test("empty stream and empty chunks yield no messages and no failure", async () => {
     for (const parts of [[], [new Uint8Array(0)], [new Uint8Array(0), new Uint8Array(0)]]) {
       const expected = await multiOutcome(chunks(...parts), referenceOptions, true);
       const actual = await multiOutcome(chunks(...parts), replacementOptions, false);
-      expect(actual).toEqual(expected);
-      expect(actual).toEqual({ values: [], error: null });
+      assert.deepStrictEqual(actual, expected);
+      assert.deepStrictEqual(actual, { values: [], error: null });
     }
   });
 
@@ -228,8 +241,8 @@ describe("decodeMultiStream", () => {
         const parts = [...prefix, tail.subarray(0, cut)];
         const expected = await multiOutcome(chunks(...parts), referenceOptions, true);
         const actual = await multiOutcome(chunks(...parts), replacementOptions, false);
-        expect(actual, `tail cut at ${cut}`).toEqual(expected);
-        expect(actual.values.length).toBe(3);
+        assert.deepStrictEqual(actual, expected, `tail cut at ${cut}`);
+        assert.strictEqual(actual.values.length, 3);
       }
     }
   });
@@ -242,7 +255,7 @@ describe("decodeMultiStream", () => {
     const actual = await collect(
       new Decoder(replacementOptions).decodeStream(chunks(...parts)),
     );
-    expect(actual).toEqual(expected);
+    assert.deepStrictEqual(actual, expected);
   });
 
   test("accepts a WHATWG ReadableStream", async () => {
@@ -257,7 +270,7 @@ describe("decodeMultiStream", () => {
     });
     const expected = await multiOutcome(chunks(...parts), referenceOptions, true);
     const actual = await collect(decodeMultiStream(readable, replacementOptions));
-    expect(actual).toEqual(expected);
+    assert.deepStrictEqual(actual, expected);
   });
 
   test("accepts a ReadableStream without an async iterator", async () => {
@@ -273,7 +286,7 @@ describe("decodeMultiStream", () => {
     Object.defineProperty(readable, Symbol.asyncIterator, { value: undefined });
     const expected = await multiOutcome(chunks(...parts), referenceOptions, true);
     const actual = await collect(decodeMultiStream(readable, replacementOptions));
-    expect(actual).toEqual(expected);
+    assert.deepStrictEqual(actual, expected);
   });
 
   test("applies decoding options to every streamed message", async () => {
@@ -300,19 +313,20 @@ describe("decodeMultiStream", () => {
         rawStrings: true,
       }),
     );
-    expect(actual).toEqual(expected);
+    assert.deepStrictEqual(actual, expected);
   });
 
   test("rejects length limits like the reference during streaming", async () => {
     const bytes = concat([referenceEncode("prefix"), referenceEncode("x".repeat(40)), referenceEncode("suffix")]);
+    const limitOptions: DecoderOptions = { maxStrLength: 4 };
     const expected = await collect(
       referenceDecodeMultiStream(chunks(...byteChunks(bytes, 3)), { maxStrLength: 4 } as never),
     );
     const actual = await collect(
-      decodeMultiStream(chunks(...byteChunks(bytes, 3)), { maxStrLength: 4 }),
+      decodeMultiStream(chunks(...byteChunks(bytes, 3)), limitOptions),
     );
-    expect(actual).toEqual(expected);
-    expect(actual.error?.name).toBe("DecodeError");
+    assert.deepStrictEqual(actual, expected);
+    assert.strictEqual(actual.error?.name, "DecodeError");
   });
 });
 
@@ -327,7 +341,7 @@ describe("decodeAsync", () => {
       const parts = [single.subarray(0, split), single.subarray(split)];
       const expected = await asyncOutcome(() => referenceDecodeAsync(chunks(...parts), referenceOptions));
       const actual = await asyncOutcome(() => decodeAsync(chunks(...parts), replacementOptions));
-      expect(actual, `split at ${split}`).toEqual(expected);
+      assert.deepStrictEqual(actual, expected, `split at ${split}`);
     }
   });
 
@@ -342,8 +356,8 @@ describe("decodeAsync", () => {
     for (const parts of cases) {
       const expected = await asyncOutcome(() => referenceDecodeAsync(chunks(...parts), referenceOptions));
       const actual = await asyncOutcome(() => decodeAsync(chunks(...parts), replacementOptions));
-      expect(actual).toEqual(expected);
-      expect(actual).toMatchObject({ error: { name: "RangeError" } });
+      assert.deepStrictEqual(actual, expected);
+      assert.strictEqual(outcomeErrorName(actual), "RangeError");
     }
   });
 
@@ -353,8 +367,8 @@ describe("decodeAsync", () => {
     for (const parts of cases) {
       const expected = await asyncOutcome(() => referenceDecodeAsync(chunks(...parts), referenceOptions));
       const actual = await asyncOutcome(() => decodeAsync(chunks(...parts), replacementOptions));
-      expect(actual).toEqual(expected);
-      expect(actual).toMatchObject({ error: { name: "RangeError" } });
+      assert.deepStrictEqual(actual, expected);
+      assert.strictEqual(outcomeErrorName(actual), "RangeError");
     }
   });
 });
@@ -369,7 +383,7 @@ describe("decodeArrayStream", () => {
       const parts = [array.subarray(0, split), array.subarray(split)];
       const expected = await collect(referenceDecodeArrayStream(chunks(...parts), referenceOptions));
       const actual = await collect(decodeArrayStream(chunks(...parts), replacementOptions));
-      expect(actual, `split at ${split}`).toEqual(expected);
+      assert.deepStrictEqual(actual, expected, `split at ${split}`);
     }
   });
 
@@ -386,7 +400,11 @@ describe("decodeArrayStream", () => {
     for (const parts of cases) {
       const expected = await collect(referenceDecodeArrayStream(chunks(...parts), referenceOptions));
       const actual = await collect(decodeArrayStream(chunks(...parts), replacementOptions));
-      expect(actual, `parts of length ${parts.map((part) => part.length).join(",")}`).toEqual(expected);
+      assert.deepStrictEqual(
+        actual,
+        expected,
+        `parts of length ${parts.map((part) => part.length).join(",")}`,
+      );
     }
   });
 });

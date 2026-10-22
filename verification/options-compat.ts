@@ -133,7 +133,11 @@ function equalError(actual: ErrorShape | null, expected: ErrorShape | null, labe
 }
 
 class Marker {
-  constructor(public readonly payload: string) {}
+  readonly payload: string;
+
+  constructor(payload: string) {
+    this.payload = payload;
+  }
 }
 
 const referenceCodec = new ReferenceExtensionCodec();

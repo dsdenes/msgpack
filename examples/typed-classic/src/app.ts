@@ -26,10 +26,13 @@ import {
  */
 
 class GeoPoint {
-  constructor(
-    readonly lat: number,
-    readonly lon: number,
-  ) {}
+  readonly lat: number;
+  readonly lon: number;
+
+  constructor(lat: number, lon: number) {
+    this.lat = lat;
+    this.lon = lon;
+  }
 }
 
 const extensionCodec = new ExtensionCodec();

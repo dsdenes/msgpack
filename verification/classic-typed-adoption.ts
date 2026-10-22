@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { cp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
+import { installDependencies, runCommand } from "./command.ts";
 
 /**
  * Adopts the replacement in a strict TypeScript application that uses classic
@@ -16,7 +17,7 @@ import { dirname, join, relative } from "node:path";
  * stay byte-for-byte identical.
  */
 
-const root = dirname(import.meta.dir);
+const root = dirname(import.meta.dirname);
 const appDir = join(root, "examples/typed-classic");
 const packageDir = join(root, "packages/msgpack");
 const appName = appDir.slice(appDir.lastIndexOf("/") + 1);
@@ -69,10 +70,7 @@ async function makeApp(variant: "baseline" | "replacement"): Promise<string> {
     recursive: true,
     filter: (source) => {
       const rel = relative(appDir, source);
-      return (
-        rel === "" ||
-        (!rel.startsWith("node_modules") && !rel.startsWith("dist") && rel !== "bun.lock")
-      );
+      return rel === "" || (!rel.startsWith("node_modules") && !rel.startsWith("dist"));
     },
   });
 
@@ -92,38 +90,19 @@ async function makeApp(variant: "baseline" | "replacement"): Promise<string> {
   }
   await writeFile(join(dir, "package.json"), JSON.stringify(manifest, null, 2) + "\n");
 
-  const result = Bun.spawnSync(["bun", "install", "--silent"], {
-    cwd: dir,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  if (result.exitCode !== 0) {
-    throw new Error(`bun install failed for ${variant}: ${result.stderr.toString()}`);
-  }
+  installDependencies(dir, variant);
   return dir;
 }
 
 function build(dir: string): { exitCode: number; output: string } {
-  const result = Bun.spawnSync(
+  return runCommand(
     [join(dir, "node_modules", "typescript", "bin", "tsc"), "-p", "tsconfig.json"],
-    { cwd: dir, stdout: "pipe", stderr: "pipe" },
+    dir,
   );
-  return {
-    exitCode: result.exitCode ?? -1,
-    output: `${result.stdout.toString()}${result.stderr.toString()}`.trim(),
-  };
 }
 
 function execute(dir: string): { exitCode: number; output: string } {
-  const result = Bun.spawnSync(["node", "dist/app.js"], {
-    cwd: dir,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  return {
-    exitCode: result.exitCode ?? -1,
-    output: `${result.stdout.toString()}${result.stderr.toString()}`.trim(),
-  };
+  return runCommand([process.execPath, "dist/app.js"], dir);
 }
 
 interface AdoptedRun {

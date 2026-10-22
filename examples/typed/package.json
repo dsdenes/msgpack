@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "start": "bun run src/app.ts"
+    "start": "node src/app.ts"
   },
   "dependencies": {
     "@dsdenes/msgpack": "file:../../packages/msgpack"

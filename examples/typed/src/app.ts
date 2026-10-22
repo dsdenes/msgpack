@@ -28,17 +28,23 @@ interface AppContext {
 }
 
 class Money {
-  constructor(
-    readonly cents: bigint,
-    readonly currency: string,
-  ) {}
+  readonly cents: bigint;
+  readonly currency: string;
+
+  constructor(cents: bigint, currency: string) {
+    this.cents = cents;
+    this.currency = currency;
+  }
 }
 
 class Tagged {
-  constructor(
-    readonly id: number,
-    readonly label: string,
-  ) {}
+  readonly id: number;
+  readonly label: string;
+
+  constructor(id: number, label: string) {
+    this.id = id;
+    this.label = label;
+  }
 }
 
 interface CodecBundle<C> {
