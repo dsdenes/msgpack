@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.worktree/
+.tmp/
+.env
+examples/*/dist-*/
+examples/*/bun.lock
+.npm-cache/
+.npm-logs/
+
+# Harness shared from the devboard checkout: on disk, never tracked here.
+/AGENTS.md
+/.devboard
+/.omp
